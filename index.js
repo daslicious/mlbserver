@@ -911,8 +911,8 @@ app.get('/playlist.m3u8', async function(req, res) {
             if ( parsed[1].startsWith('http') ) {
               key = parsed[1]
               session.debuglog('key url : ' + key)
-            } else if ( key.startsWith('data:;base64,') ) {
-              let newparsed = key.split(',')
+            } else if ( parsed[1].startsWith('data:;base64,') ) {
+              let newparsed = parsed[1].split(',')
               key = newparsed[1]
               session.debuglog('found key data : ' + key)
             } else {
