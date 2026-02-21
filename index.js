@@ -1884,6 +1884,19 @@ app.get('/', async function(req, res) {
 
     if ( cache_data.dates && cache_data.dates[0] && cache_data.dates[0].games ) {
       for (var j = 0; j < cache_data.dates[0].games.length; j++) {
+        // Skip games with no streamable video feeds
+        let gameHasStreamableFeed = false
+        if ( cache_data.dates[0].games[j].broadcasts ) {
+          for (var bf = 0; bf < cache_data.dates[0].games[j].broadcasts.length; bf++) {
+            let b = cache_data.dates[0].games[j].broadcasts[bf]
+            if ( b.availableForStreaming && b.type == 'TV' ) {
+              gameHasStreamableFeed = true
+              break
+            }
+          }
+        }
+        if ( !gameHasStreamableFeed ) continue
+
         let gamePk = cache_data.dates[0].games[j].gamePk.toString()
 
         let game_started = false
