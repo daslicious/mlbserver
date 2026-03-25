@@ -8,6 +8,7 @@ const root = require('root')
 const path = require('path')
 const url = require('url')
 const assert = require('assert')
+const fs = require('fs')
 var crypto = require('crypto')
 
 // More required Node packages, for multiview streaming
@@ -131,7 +132,7 @@ var argv = minimist(process.argv, {
     v: 'version',
     e: 'env'
   },
-  boolean: ['ffmpeg_logging', 'debug', 'logout', 'session', 'cache', 'version', 'free', 'env'],
+  boolean: ['ffmpeg_logging', 'debug', 'logout', 'session', 'cache', 'version', 'free', 'env', 'show_multiview'],
   string: ['account_username', 'account_password', 'fav_teams', 'multiview_path', 'ffmpeg_path', 'ffmpeg_encoder', 'page_username', 'page_password', 'content_protect', 'data_directory', 'http_root']
 })
 
@@ -249,6 +250,419 @@ function corsMiddleware(req, res, next) {
 }
 httpAttach(multiview_app, corsMiddleware)
 multiview_app.listen(multiview_port)
+
+// Serve static files from public/ directory for the new SPA frontend
+var MIME_TYPES = { '.html': 'text/html', '.css': 'text/css', '.js': 'application/javascript', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.ico': 'image/x-icon' }
+app.get('/app/*', async function(req, res) {
+  if ( ! (await protect(req, res)) ) return
+  try {
+    let reqPath = req.url.split('?')[0].replace('/app', '') || '/index.html'
+    if ( reqPath === '/' || reqPath === '' ) reqPath = '/index.html'
+    // Guard against path traversal
+    let filePath = path.join(__dirname, 'public', reqPath)
+    if ( !filePath.startsWith(path.join(__dirname, 'public')) ) {
+      res.error(403, 'Forbidden')
+      return
+    }
+    let ext = path.extname(filePath)
+    let contentType = MIME_TYPES[ext] || 'application/octet-stream'
+    fs.readFile(filePath, function(err, data) {
+      if (err) {
+        res.error(404, 'Not Found')
+        return
+      }
+      res.setHeader('Content-Type', contentType)
+      res.setHeader('Access-Control-Allow-Origin', '*')
+      res.end(data)
+    })
+  } catch (e) {
+    session.log('static file serving error : ' + e.message)
+    res.error(500, 'Internal Server Error')
+  }
+})
+
+// API: Return server config and valid options
+app.get('/api/config', async function(req, res) {
+  if ( ! (await protect(req, res)) ) return
+  try {
+    session.requestlog('api/config', req)
+    let config = {
+      appname: appname,
+      version: version,
+      httpRoot: http_root,
+      port: parseInt(session.data.port),
+      multiviewPort: parseInt(session.data.multiviewPort),
+      contentProtect: session.protection.content_protect || '',
+      scanMode: session.data.scan_mode || VALID_SCAN_MODES[0],
+      linkType: session.data.linkType || VALID_LINK_TYPES[0],
+      favTeams: session.credentials.fav_teams || [],
+      free: argv.free || false,
+      showMultiview: argv.show_multiview || false,
+      validOptions: {
+        dates: VALID_DATES,
+        mediaTypes: VALID_MEDIA_TYPES,
+        linkTypes: VALID_LINK_TYPES,
+        startFrom: VALID_START_FROM,
+        controls: VALID_CONTROLS,
+        scores: VALID_SCORES,
+        resolutions: VALID_RESOLUTIONS,
+        displayBandwidths: DISPLAY_BANDWIDTHS,
+        audioTracks: VALID_AUDIO_TRACKS,
+        displayAudioTracks: DISPLAY_AUDIO_TRACKS,
+        captions: VALID_CAPTIONS,
+        skip: VALID_SKIP,
+        pad: VALID_PAD,
+        forceVod: VALID_FORCE_VOD,
+        scanModes: VALID_SCAN_MODES,
+        inningHalves: VALID_INNING_HALF,
+        inningNumbers: VALID_INNING_NUMBER
+      },
+      defaults: {
+        multiviewResolution: DEFAULT_MULTIVIEW_RESOLUTION,
+        multiviewAudioTrack: DEFAULT_MULTIVIEW_AUDIO_TRACK,
+        skipAdjust: DEFAULT_SKIP_ADJUST,
+        yesterdayUTCHours: YESTERDAY_UTC_HOURS,
+        todayUTCHours: session.getTodayUTCHours(),
+        secondsPerSegment: SECONDS_PER_SEGMENT
+      },
+      teamColors: TEAM_COLORS,
+      levels: session.getLevels(),
+      orgs: session.getOrgs()
+    }
+    res.setHeader('Content-Type', 'application/json')
+    res.setHeader('Access-Control-Allow-Origin', '*')
+    res.end(JSON.stringify(config))
+  } catch (e) {
+    session.log('api/config error : ' + e.message)
+    res.setHeader('Content-Type', 'application/json')
+    res.end(JSON.stringify({ error: e.message }))
+  }
+})
+
+// API: Return games for a given date/level/org
+app.get('/api/games', async function(req, res) {
+  if ( ! (await protect(req, res)) ) return
+  try {
+    session.requestlog('api/games', req)
+
+    let gameDate = session.liveDate()
+    let today = gameDate
+    let yesterday = session.yesterdayDate()
+    let todayUTCHours = session.getTodayUTCHours()
+    let curDate = new Date()
+    if ( req.query.date ) {
+      if ( req.query.date == VALID_DATES[1] ) {
+        gameDate = yesterday
+      } else if ( req.query.date != VALID_DATES[0] ) {
+        gameDate = req.query.date
+      }
+    } else {
+      let utcHours = curDate.getUTCHours()
+      if ( (utcHours >= todayUTCHours) && (utcHours < YESTERDAY_UTC_HOURS) ) {
+        gameDate = yesterday
+      }
+    }
+
+    var levels = session.getLevels()
+    var level_labels = Object.keys(levels)
+    var default_level = level_labels[0]
+    var level = default_level
+    if ( req.query.level ) {
+      level = decodeURIComponent(req.query.level)
+    }
+    if ( typeof levels[level] === 'undefined' ) {
+      level = default_level
+    }
+
+    var level_ids = levels[level]
+    var default_org = level_labels[level_labels.length-1]
+    var org = default_org
+    var team_ids = ''
+    if ( req.query.org ) {
+      org = decodeURIComponent(req.query.org)
+      if ( typeof session.getAffiliateTeamIds(org) === 'undefined' ) {
+        org = default_org
+      } else {
+        team_ids += session.getTeamIds(org) + ',' + session.getAffiliateTeamIds(org)
+        level = default_org
+      }
+    } else if ( level_ids == levels['MLB'] ) {
+      team_ids = session.getTeamIds()
+      for (let i=0; i<session.credentials.fav_teams.length; i++) {
+        if ( session.credentials.fav_teams[i] != '' ) {
+          let affiliate_team_ids = session.getAffiliateTeamIds(session.credentials.fav_teams[i])
+          if ( affiliate_team_ids ) {
+            level_ids = levels['All']
+            team_ids += ',' + affiliate_team_ids
+          }
+        }
+      }
+    }
+    let cache_name = gameDate
+    if ( level_ids != levels['MLB'] ) {
+      cache_name += '.' + level_ids.replaceAll(',', '')
+    }
+    if ( team_ids != '' ) {
+      cache_name += '.' + team_ids.replaceAll(',', '')
+    }
+    if ( cache_name.length > 250 ) {
+      cache_name = cache_name.slice(0, 250)
+    }
+
+    var cache_data = await session.getDayData(gameDate, false, level_ids, team_ids)
+
+    let entitlements = await session.getEntitlements() || []
+
+    let blackouts = {}
+    let pre_post_shows = {}
+    if ( cache_data.dates && cache_data.dates[0] && cache_data.dates[0].games && (cache_data.dates[0].games.length > 0) ) {
+      blackouts = await session.get_blackout_games(cache_data.dates[0].date, true)
+      if ( gameDate >= today ) {
+        pre_post_shows = await session.get_pre_post_shows(cache_data.dates[0].date)
+      }
+    }
+
+    // Build special streams info
+    let specialStreams = {}
+
+    // MASN
+    if ( entitlements.includes('MASN_110') ) {
+      specialStreams.masn = { available: true, event: 'MASN' }
+    }
+    // MLB Network
+    if ( entitlements.includes('MLBN') || entitlements.includes('EXECMLB') || entitlements.includes('MLBTVMLBNADOBEPASS') ) {
+      specialStreams.mlbNetwork = { available: true, event: 'MLBN' }
+    }
+    // SNLA
+    if ( entitlements.includes('SNLA_119') ) {
+      specialStreams.snla = { available: true, event: 'SNLA' }
+    }
+    // SNY
+    if ( entitlements.includes('SNY_121') ) {
+      specialStreams.sny = { available: true, event: 'SNY' }
+    }
+
+    // Big Inning
+    if ( (entitlements.length > 0) && cache_data.dates && cache_data.dates[0] && (cache_data.dates[0].date >= today) && cache_data.dates[0].games && (cache_data.dates[0].games.length > 1) && cache_data.dates[0].games[0] && (cache_data.dates[0].games[0].seriesDescription == 'Regular Season') && (level_ids == levels['MLB'] || level_ids.startsWith(levels['MLB'] + ',')) ) {
+      let big_inning = await session.getBigInningSchedule(gameDate)
+      if ( big_inning && big_inning.start ) {
+        specialStreams.bigInning = { available: true, event: 'biginning', start: big_inning.start, end: big_inning.end }
+      }
+    }
+
+    // Game Changer and Stream Finder
+    if ( (gameDate >= today) && cache_data.dates && cache_data.dates[0] && cache_data.dates[0].games && (cache_data.dates[0].games.length > 1) && (level_ids == levels['MLB'] || level_ids.startsWith(levels['MLB'] + ',')) ) {
+      let gameIndexes = await session.get_first_and_last_games(cache_data.dates[0].games, blackouts)
+      if ( (typeof gameIndexes.firstGameIndex !== 'undefined') && (typeof gameIndexes.lastGameIndex !== 'undefined') && (gameIndexes.firstGameIndex !== gameIndexes.lastGameIndex) ) {
+        let compareStart = new Date(cache_data.dates[0].games[gameIndexes.firstGameIndex].gameDate)
+        let compareEnd = new Date(cache_data.dates[0].games[gameIndexes.lastGameIndex].gameDate)
+        if ( cache_data.dates[0].games[gameIndexes.lastGameIndex].status && (cache_data.dates[0].games[gameIndexes.lastGameIndex].status.startTimeTBD == true) ) {
+          compareEnd = new Date(cache_data.dates[0].games[gameIndexes.lastGameIndex-1].gameDate)
+          compareEnd.setHours(compareEnd.getHours()+4)
+        }
+        compareEnd.setHours(compareEnd.getHours()+4)
+        specialStreams.gameChanger = { available: true, start: compareStart.toISOString(), end: compareEnd.toISOString() }
+        specialStreams.streamFinder = { available: true, start: compareStart.toISOString(), end: compareEnd.toISOString() }
+      }
+    }
+
+    // Build games array
+    let games = []
+    if ( cache_data.dates && cache_data.dates[0] && cache_data.dates[0].games ) {
+      for (var j = 0; j < cache_data.dates[0].games.length; j++) {
+        let g = cache_data.dates[0].games[j]
+        let gamePk = g.gamePk.toString()
+
+        let awayTeam = {
+          teamId: g.teams['away'].team.id,
+          abbreviation: g.teams['away'].team.abbreviation,
+          shortName: g.teams['away'].team.shortName,
+          isMajorLeague: g.teams['away'].team.sport.name == 'Major League Baseball',
+          sportId: g.teams['away'].team.sport.id,
+          score: g.teams['away'].score,
+          probablePitcher: (g.teams['away'].probablePitcher && g.teams['away'].probablePitcher.fullName) ? g.teams['away'].probablePitcher.fullName : null
+        }
+        if ( !awayTeam.isMajorLeague ) {
+          awayTeam.parentOrg = (g.teams['away'].team.parentOrgName && g.teams['away'].team.parentOrgName != 'Office of the Commissioner') ? session.getParent(g.teams['away'].team.parentOrgName) : null
+          awayTeam.levelName = session.getLevelNameFromSportId(g.teams['away'].team.sport.id)
+        }
+
+        let homeTeam = {
+          teamId: g.teams['home'].team.id,
+          abbreviation: g.teams['home'].team.abbreviation,
+          shortName: g.teams['home'].team.shortName,
+          isMajorLeague: g.teams['home'].team.sport.name == 'Major League Baseball',
+          sportId: g.teams['home'].team.sport.id,
+          score: g.teams['home'].score,
+          probablePitcher: (g.teams['home'].probablePitcher && g.teams['home'].probablePitcher.fullName) ? g.teams['home'].probablePitcher.fullName : null
+        }
+        if ( !homeTeam.isMajorLeague ) {
+          homeTeam.parentOrg = (g.teams['home'].team.parentOrgName && g.teams['home'].team.parentOrgName != 'Office of the Commissioner') ? session.getParent(g.teams['home'].team.parentOrgName) : null
+          homeTeam.levelName = session.getLevelNameFromSportId(g.teams['home'].team.sport.id)
+        }
+        if ( g.teams['home'].team.league ) {
+          homeTeam.leagueId = g.teams['home'].team.league.id
+        }
+
+        let scheduledInnings = await session.get_scheduled_innings(g)
+
+        let isFavorite = session.credentials.fav_teams.includes(awayTeam.abbreviation) || session.credentials.fav_teams.includes(homeTeam.abbreviation)
+        let favoriteTeam = null
+        if ( isFavorite ) {
+          favoriteTeam = session.credentials.fav_teams.includes(homeTeam.abbreviation) ? homeTeam.abbreviation : awayTeam.abbreviation
+        }
+
+        let isFreeGame = !!(argv.free && g.broadcasts && g.broadcasts[0] && g.broadcasts[0].freeGame)
+
+        let isWinterLeague = !!(homeTeam.leagueId && session.getWinterIds().includes(homeTeam.leagueId))
+        let isAFL = !!(homeTeam.leagueId && session.getAFLid() == homeTeam.leagueId)
+
+        // Determine resume status
+        let resumeStatus = false
+        let resumeDate = null
+        let resumeLabel = null
+        if ( g.resumeGameDate || g.resumedFromDate ) {
+          resumeStatus = 'archived'
+          if ( g.resumeGameDate ) {
+            resumeDate = g.resumeDate
+            resumeLabel = 'Resuming on'
+          } else {
+            resumeDate = g.resumedFrom
+            resumeLabel = 'Resumed from'
+          }
+          if ( g.broadcasts ) {
+            for (var k = 0; k < g.broadcasts.length; k++) {
+              if ( g.broadcasts[k].mediaState && g.broadcasts[k].mediaState.mediaStateCode && g.broadcasts[k].mediaState.mediaStateCode == 'MEDIA_ON' ) {
+                resumeStatus = 'live'
+                break
+              }
+            }
+          }
+        }
+
+        // Build broadcasts array
+        let broadcastList = []
+        if ( g.broadcasts ) {
+          for (var k = 0; k < g.broadcasts.length; k++) {
+            let b = g.broadcasts[k]
+            if ( b.availableForStreaming ) {
+              let mediaTitle = 'Audio'
+              if ( b.type == 'TV' ) {
+                mediaTitle = 'MLBTV'
+              } else if ( b.language == 'es' ) {
+                mediaTitle = 'Spanish'
+              }
+              let isBlackedOut = !!(blackouts[gamePk] && blackouts[gamePk].blackout_feeds && blackouts[gamePk].blackout_feeds.includes(b.mediaId))
+              let hasPreGame = !!(pre_post_shows.pregame_shows && pre_post_shows.pregame_shows[b.mediaId])
+              let hasPostGame = !!(pre_post_shows.postgame_shows && pre_post_shows.postgame_shows[b.mediaId])
+
+              broadcastList.push({
+                mediaId: b.mediaId,
+                mediaType: mediaTitle,
+                language: b.language,
+                callSign: b.callSign,
+                homeAway: b.homeAway,
+                isNational: b.isNational,
+                mediaStateCode: (b.mediaState && b.mediaState.mediaStateCode) ? b.mediaState.mediaStateCode : null,
+                freeGame: !!b.freeGame,
+                isBlackedOut: isBlackedOut,
+                blackoutType: isBlackedOut ? blackouts[gamePk].blackout_type : null,
+                blackoutExpiry: (isBlackedOut && blackouts[gamePk].blackoutExpiry) ? blackouts[gamePk].blackoutExpiry : null,
+                hasPreGame: hasPreGame,
+                hasPostGame: hasPostGame
+              })
+            }
+          }
+        }
+
+        games.push({
+          gamePk: gamePk,
+          gameDate: g.gameDate,
+          startTimeTBD: !!(g.status && g.status.startTimeTBD),
+          doubleHeader: g.doubleHeader,
+          gameNumber: g.gameNumber,
+          description: g.description || '',
+          seriesDescription: g.seriesDescription || '',
+          scheduledInnings: scheduledInnings,
+          status: {
+            abstractGameState: g.status.abstractGameState,
+            detailedState: g.status.detailedState
+          },
+          flags: g.flags || {},
+          linescore: g.linescore || null,
+          away: awayTeam,
+          home: homeTeam,
+          isFavorite: isFavorite,
+          favoriteTeam: favoriteTeam,
+          isFreeGame: isFreeGame,
+          isWinterLeague: isWinterLeague,
+          isAFL: isAFL,
+          broadcasts: broadcastList,
+          resumeStatus: resumeStatus,
+          resumeDate: resumeDate,
+          resumeLabel: resumeLabel
+        })
+      }
+    }
+
+    let result = {
+      gameDate: gameDate,
+      today: today,
+      yesterday: yesterday,
+      cacheUpdated: session.getCacheUpdatedDate(cache_name),
+      level: level,
+      org: org,
+      entitlements: entitlements,
+      specialStreams: specialStreams,
+      games: games,
+      hasBlackouts: Object.keys(blackouts).length > 0,
+      hasPrePostShows: Object.keys(pre_post_shows).length > 0
+    }
+
+    res.setHeader('Content-Type', 'application/json')
+    res.setHeader('Access-Control-Allow-Origin', '*')
+    res.end(JSON.stringify(result))
+  } catch (e) {
+    session.log('api/games error : ' + e.message)
+    res.setHeader('Content-Type', 'application/json')
+    res.end(JSON.stringify({ error: e.message }))
+  }
+})
+
+// API: Get/Set user settings (scan mode, link type)
+app.get('/api/settings', async function(req, res) {
+  if ( ! (await protect(req, res)) ) return
+  try {
+    res.setHeader('Content-Type', 'application/json')
+    res.setHeader('Access-Control-Allow-Origin', '*')
+    res.end(JSON.stringify({ scanMode: session.data.scan_mode, linkType: session.data.linkType }))
+  } catch (e) {
+    res.setHeader('Content-Type', 'application/json')
+    res.end(JSON.stringify({ error: e.message }))
+  }
+})
+
+app.post('/api/settings', async function(req, res) {
+  if ( ! (await protect(req, res)) ) return
+  try {
+    req.on('body', function(body) {
+      try {
+        let data = JSON.parse(body)
+        if ( data.scanMode ) session.setScanMode(data.scanMode)
+        if ( data.linkType ) session.setLinkType(data.linkType)
+        res.setHeader('Content-Type', 'application/json')
+        res.setHeader('Access-Control-Allow-Origin', '*')
+        res.end(JSON.stringify({ success: true, scanMode: session.data.scan_mode, linkType: session.data.linkType }))
+      } catch (e) {
+        res.setHeader('Content-Type', 'application/json')
+        res.end(JSON.stringify({ error: e.message }))
+      }
+    })
+  } catch (e) {
+    res.setHeader('Content-Type', 'application/json')
+    res.end(JSON.stringify({ error: e.message }))
+  }
+})
 
 // Listen for clear cache requests
 app.get('/clearcache', async function(req, res) {

@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>mlbserver</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/app/style.css">
+</head>
+<body>
+  <div id="app">
+    <app-header></app-header>
+    <main class="main-content">
+      <template v-if="state.menuOpen">
+        <filter-bar></filter-bar>
+        <video-options></video-options>
+        <special-streams></special-streams>
+      </template>
+      <game-table></game-table>
+      <template v-if="state.menuOpen">
+        <multiview-panel></multiview-panel>
+        <export-links></export-links>
+      </template>
+    </main>
+    <div class="load-overlay" v-if="state.loading">
+      <div class="loader"></div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <script type="module" src="/app/app.js"></script>
+</body>
+</html>
