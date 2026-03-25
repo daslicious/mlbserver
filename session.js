@@ -3166,8 +3166,31 @@ class sessionClass {
       }
       var response = await this.httpGet(reqObj, false)
       if ( response ) {
+        // Strip trademark (TM) and registered (R) glyphs from SVG logos
+        // These are short trailing <path> elements just before </svg>
+        let cleaned = response.toString()
+        for (let pass = 0; pass < 2; pass++) {
+          let svgEnd = cleaned.lastIndexOf('</svg>')
+          if (svgEnd < 0) break
+          let before = cleaned.substring(0, svgEnd)
+          let lastPathStart = before.lastIndexOf('<path')
+          if (lastPathStart < 0) break
+          // Find the end of this <path .../> element
+          let lastPathEnd = cleaned.indexOf('/>', lastPathStart)
+          if (lastPathEnd < 0) break
+          lastPathEnd += 2 // include the '/>'
+          let pathStr = cleaned.substring(lastPathStart, lastPathEnd)
+          // Only strip if this path element is short (TM/R glyph, not main logo)
+          if (pathStr.length < 350) {
+            cleaned = cleaned.substring(0, lastPathStart) + cleaned.substring(lastPathEnd)
+          } else {
+            break
+          }
+        }
+        response = cleaned
         this.debuglog('getImage response : ' + response)
         fs.writeFileSync(imagePath, response)
+        return response
       } else {
         this.debuglog('failed to get image for ' + teamId)
       }

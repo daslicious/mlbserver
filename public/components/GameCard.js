@@ -66,14 +66,14 @@ export default {
       return t
     },
     awayLogoUrl() {
-      return this.game.away.teamId
-        ? 'https://www.mlbstatic.com/team-logos/' + this.game.away.teamId + '.svg'
-        : ''
+      if (!this.game.away.teamId) return ''
+      const cp = this.actions.getContentProtectParam('&')
+      return '/image.svg?teamId=' + this.game.away.teamId + cp
     },
     homeLogoUrl() {
-      return this.game.home.teamId
-        ? 'https://www.mlbstatic.com/team-logos/' + this.game.home.teamId + '.svg'
-        : ''
+      if (!this.game.home.teamId) return ''
+      const cp = this.actions.getContentProtectParam('&')
+      return '/image.svg?teamId=' + this.game.home.teamId + cp
     },
     showScores() {
       return this.state.scores === 'Show' &&
@@ -194,7 +194,7 @@ export default {
   methods: {
     lastName(name) { const i = name.indexOf(' '); return i === -1 ? name : name.substring(i + 1) },
     feedLabel(b) { return b.isNational ? 'NATIONAL' : b.callSign },
-    onLogoError(e) { e.target.style.display = 'none' },
+    onLogoError(e) { e.target.style.opacity = '0' },
     buildLink(b) {
       if (!this.cfg) return '#'
       const s = this.state, hr = this.cfg.httpRoot, link = this.actions.getLinkPath()

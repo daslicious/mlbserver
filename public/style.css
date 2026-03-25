@@ -537,16 +537,16 @@ details.panel > .panel-body {
 
 .card-status {
   font-family: var(--font-mono);
-  font-size: 0.7rem;
+  font-size: 0.88rem;
   color: var(--text-secondary);
 }
 .card-status.live { color: var(--live-red); font-weight: 600; }
 .card-status.final { color: var(--final-muted); }
 
 .card-pitchers {
-  font-size: 0.62rem;
+  font-size: 0.78rem;
   color: var(--text-muted);
-  margin-top: 1px;
+  margin-top: 2px;
 }
 
 /* Broadcasts */
