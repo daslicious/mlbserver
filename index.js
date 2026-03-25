@@ -251,7 +251,7 @@ function corsMiddleware(req, res, next) {
 httpAttach(multiview_app, corsMiddleware)
 multiview_app.listen(multiview_port)
 
-// Serve static files from public/ directory for the new SPA frontend
+// Serve static files from public/ directory for the SPA frontend
 var MIME_TYPES = { '.html': 'text/html', '.css': 'text/css', '.js': 'application/javascript', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.ico': 'image/x-icon' }
 app.get('/app/*', async function(req, res) {
   if ( ! (await protect(req, res)) ) return
@@ -1790,8 +1790,24 @@ function getLastName(fullName) {
   return fullName.substring(indexOfSpace + 1);
 }
 
-// Server homepage, base URL
+// New SPA homepage
 app.get('/', async function(req, res) {
+  if ( ! (await protect(req, res)) ) return
+  try {
+    let filePath = path.join(__dirname, 'public', 'index.html')
+    fs.readFile(filePath, function(err, data) {
+      if (err) { res.error(500, 'Failed to load frontend'); return }
+      res.setHeader('Content-Type', 'text/html')
+      res.end(data)
+    })
+  } catch (e) {
+    session.log('homepage error : ' + e.message)
+    res.error(500, 'Internal Server Error')
+  }
+})
+
+// Old homepage
+app.get('/old', async function(req, res) {
   try {
     if ( ! (await protect(req, res)) ) return
 
