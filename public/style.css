@@ -448,6 +448,9 @@ details.panel > .panel-body {
   transition: all 180ms var(--ease);
   display: flex;
   flex-direction: column;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
 }
 .game-card:hover {
   border-color: var(--border-hover);
