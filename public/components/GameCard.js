@@ -67,13 +67,11 @@ export default {
     },
     awayLogoUrl() {
       if (!this.game.away.teamId) return ''
-      const cp = this.actions.getContentProtectParam('&')
-      return '/image.svg?teamId=' + this.game.away.teamId + cp
+      return '/app/logos/' + this.game.away.teamId + '.svg'
     },
     homeLogoUrl() {
       if (!this.game.home.teamId) return ''
-      const cp = this.actions.getContentProtectParam('&')
-      return '/image.svg?teamId=' + this.game.home.teamId + cp
+      return '/app/logos/' + this.game.home.teamId + '.svg'
     },
     showScores() {
       return this.state.scores === 'Show' &&
