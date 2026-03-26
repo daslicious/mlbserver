@@ -133,6 +133,7 @@ export default {
       if (this.isFullyBlackedOut) return '#'
       const hr = this.cfg.httpRoot
       let qs = '?gamePk=' + this.game.gamePk
+      if (this.state.gamesData) qs += '&date=' + this.state.gamesData.gameDate
       if (this.homeBroadcast) qs += '&mediaId=' + this.homeBroadcast.mediaId
       const s = this.state
       if (s.resolution !== this.cfg.validOptions.resolutions[0]) qs += '&resolution=' + s.resolution

@@ -288,7 +288,7 @@ video {
 
   // Fetch game broadcasts for stream switcher
   if (gamePk) {
-    var apiUrl = '/api/games?date=' + (params.get('date') || 'today');
+    var apiUrl = '/api/games?' + (params.get('date') ? 'date=' + params.get('date') : '');
     if (contentProtect) apiUrl += '&content_protect=' + contentProtect;
     fetch(apiUrl).then(function(r) { return r.json(); }).then(function(data) {
       if (!data.games) return;
