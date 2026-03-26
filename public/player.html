@@ -48,8 +48,13 @@ a:hover { color: #f0be70; }
 }
 
 video {
-  width: 100%; max-width: 1280px; height: auto; max-height: 100vh;
+  width: 100%; max-width: 1280px; height: auto; min-height: 60px; max-height: 100vh;
   outline: none; background: #000;
+}
+video:not([data-has-video]) {
+  height: 80px;
+  background: var(--bg-card);
+  border-radius: var(--radius-sm);
 }
 
 /* Bottom controls */
@@ -249,6 +254,8 @@ video {
     loadingMsg.querySelector('span').style.animation = 'fade-in 600ms 500ms forwards';
 
     if (hls) { hls.destroy(); hls = null; }
+    video.removeAttribute('data-has-video');
+    video.controls = false;
 
     if (Hls.isSupported()) {
       var hlsConfig = {};
@@ -256,8 +263,14 @@ video {
       hls = new Hls(hlsConfig);
       hls.loadSource(url);
       hls.attachMedia(video);
-      hls.on(Hls.Events.MANIFEST_PARSED, function() {
+      hls.on(Hls.Events.MANIFEST_PARSED, function(event, data) {
         loadingMsg.style.display = 'none';
+        if (data.levels && data.levels.some(function(l) { return l.videoCodec; })) {
+          video.setAttribute('data-has-video', '');
+        } else {
+          video.removeAttribute('data-has-video');
+          video.controls = true;
+        }
         video.play().then(function() {
           if (startFrom === 'Beginning') video.currentTime = 0;
         }).catch(function() {});
