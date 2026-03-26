@@ -375,7 +375,8 @@ video:not([data-has-video]) {
         var hlUrl = '/highlights?gamePk=' + gamePk + '&gameDate=' + gameDate;
         if (contentProtect) hlUrl += '&content_protect=' + contentProtect;
         html += '<div class="stream-divider"></div>';
-        html += '<a class="stream-item" href="' + hlUrl + '">Highlights</a>';
+        html += '<button class="stream-item" id="hlToggle" onclick="loadHighlights(\'' + hlUrl.replace(/'/g, "\\'") + '\')">Highlights</button>';
+        html += '<div id="hlList"></div>';
       }
 
       streamList.innerHTML = html;
@@ -395,6 +396,51 @@ video:not([data-has-video]) {
     var items = streamList.querySelectorAll('.stream-item');
     items.forEach(function(el) { el.classList.remove('active'); });
     event.target.classList.add('active');
+    streamList.classList.remove('open');
+  };
+
+  // Load highlights into stream list
+  window.loadHighlights = function(url) {
+    var hlList = document.getElementById('hlList');
+    var hlToggle = document.getElementById('hlToggle');
+    if (hlList.children.length > 0) {
+      hlList.innerHTML = '';
+      hlToggle.textContent = 'Highlights';
+      return;
+    }
+    hlToggle.textContent = 'Loading...';
+    fetch(url).then(function(r) { return r.json(); }).then(function(data) {
+      if (!Array.isArray(data) || data.length === 0) {
+        hlToggle.textContent = 'No highlights';
+        return;
+      }
+      hlToggle.textContent = 'Highlights (' + data.length + ')';
+      var html = '';
+      data.forEach(function(h) {
+        var title = h.headline || h.title || 'Highlight';
+        var hlsUrl = null;
+        var mp4Url = null;
+        if (h.playbacks) {
+          h.playbacks.forEach(function(p) {
+            if (p.url && p.url.indexOf('.m3u8') >= 0 && !hlsUrl) hlsUrl = p.url;
+            if (p.url && p.url.indexOf('.mp4') >= 0 && !mp4Url) mp4Url = p.url;
+          });
+        }
+        if (hlsUrl) {
+          html += '<button class="stream-item" onclick="playHighlight(\'' + hlsUrl.replace(/'/g, "\\'") + '\')" title="' + title.replace(/"/g, '&quot;') + '">' + title + '</button>';
+        } else if (mp4Url) {
+          html += '<a class="stream-item" href="' + mp4Url + '" target="_blank" title="' + title.replace(/"/g, '&quot;') + '">' + title + ' (MP4)</a>';
+        }
+      });
+      hlList.innerHTML = html;
+    }).catch(function() {
+      hlToggle.textContent = 'Highlights (error)';
+    });
+  };
+
+  // Play a highlight in the player
+  window.playHighlight = function(url) {
+    loadStream(url);
     streamList.classList.remove('open');
   };
 
