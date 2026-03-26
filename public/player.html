@@ -48,13 +48,16 @@ a:hover { color: #f0be70; }
 }
 
 video {
-  width: 100%; max-width: 1280px; height: auto; min-height: 60px; max-height: 100vh;
+  width: 100%; height: 100vh;
   outline: none; background: #000;
+  object-fit: contain;
 }
 video:not([data-has-video]) {
   height: 80px;
+  max-width: 800px;
   background: var(--bg-card);
   border-radius: var(--radius-sm);
+  object-fit: initial;
 }
 
 /* Bottom controls */
