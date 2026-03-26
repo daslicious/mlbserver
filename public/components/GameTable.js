@@ -26,6 +26,17 @@ export default {
         </div>
       </template>
 
+      <!-- Final Games (only when menu open) -->
+      <template v-if="finalGames.length > 0 && state.menuOpen">
+        <div class="section-header">
+          <span class="section-tag">FINAL</span>
+          <span class="section-count">{{ finalGames.length }}</span>
+        </div>
+        <div class="game-grid">
+          <game-card v-for="g in finalGames" :key="g.gamePk" :game="g" />
+        </div>
+      </template>
+
       <!-- No live/upcoming -->
       <div class="no-games" v-if="liveGames.length === 0 && upcomingGames.length === 0 && !state.loading">
         <div class="no-games-text">No live or upcoming games</div>
@@ -46,6 +57,12 @@ export default {
     },
     upcomingGames() {
       return this.allGames.filter(g => g.status.abstractGameState === 'Preview')
+    },
+    finalGames() {
+      return this.allGames.filter(g =>
+        g.status.abstractGameState === 'Final' ||
+        g.status.detailedState === 'Postponed'
+      )
     }
   }
 }
