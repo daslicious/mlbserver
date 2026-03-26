@@ -3179,7 +3179,7 @@ class sessionClass {
           if (lastPathEnd < 0) break
           lastPathEnd += 2
           let pathStr = cleaned.substring(lastPathStart, lastPathEnd)
-          if (pathStr.length < 350) {
+          if (pathStr.length < 450) {
             cleaned = cleaned.substring(0, lastPathStart) + cleaned.substring(lastPathEnd)
           } else {
             break
@@ -3189,12 +3189,12 @@ class sessionClass {
         // These are short trailing sub-paths (after z) that draw tiny glyphs
         cleaned = cleaned.replace(/\sd="([^"]+)"/g, function(match, d) {
           let parts = d.split(/(?<=z)/)
-          if (parts.length <= 2) return match
+          if (parts.length <= 1) return match
           // Check if trailing sub-paths are short glyph fragments
           let totalTrailing = 0
           let cutIndex = parts.length
-          for (let i = parts.length - 1; i >= 2; i--) {
-            if (parts[i].length < 200) {
+          for (let i = parts.length - 1; i >= 1; i--) {
+            if (parts[i].length < 260) {
               totalTrailing += parts[i].length
               cutIndex = i
             } else {
