@@ -203,13 +203,17 @@ video {
   var currentMediaId = params.get('mediaId') || '';
 
   // Build stream URL from params
-  function buildStreamURL(mediaId) {
+  function buildStreamURL(mediaId, mediaType) {
     var url = '/stream.m3u8?mediaId=' + mediaId;
     var passthrough = ['resolution', 'audio_track', 'captions', 'skip', 'skip_adjust', 'pad', 'force_vod', 'inning_half', 'inning_number'];
     passthrough.forEach(function(key) {
       var val = params.get(key);
       if (val) url += '&' + key + '=' + encodeURIComponent(val);
     });
+    // Force VOD for audio streams so they get a seekable timeline
+    if (mediaType && mediaType !== 'MLBTV' && url.indexOf('force_vod') === -1) {
+      url += '&force_vod=on';
+    }
     if (gamePk) url += '&gamePk=' + gamePk;
     if (contentProtect) url += '&content_protect=' + contentProtect;
     return url;
@@ -313,7 +317,7 @@ video {
           if (b.mediaId === currentMediaId) cls += ' active';
           if (b.isBlackedOut) cls += ' blacked';
           if (isActive && !b.isBlackedOut) {
-            html += '<button class="' + cls + '" onclick="switchStream(\'' + b.mediaId + '\')">' + label + '</button>';
+            html += '<button class="' + cls + '" onclick="switchStream(\'' + b.mediaId + '\',\'' + b.mediaType + '\')">' + label + '</button>';
           } else {
             html += '<div class="' + cls + '">' + label + (b.isBlackedOut ? ' (blacked out)' : '') + '</div>';
           }
@@ -329,7 +333,7 @@ video {
           if (b.mediaId === currentMediaId) cls += ' active';
           if (b.isBlackedOut) cls += ' blacked';
           if (isActive && !b.isBlackedOut) {
-            html += '<button class="' + cls + '" onclick="switchStream(\'' + b.mediaId + '\')">' + label + '</button>';
+            html += '<button class="' + cls + '" onclick="switchStream(\'' + b.mediaId + '\',\'' + b.mediaType + '\')">' + label + '</button>';
           } else {
             html += '<div class="' + cls + '">' + label + '</div>';
           }
@@ -345,7 +349,7 @@ video {
           if (b.mediaId === currentMediaId) cls += ' active';
           if (b.isBlackedOut) cls += ' blacked';
           if (isActive && !b.isBlackedOut) {
-            html += '<button class="' + cls + '" onclick="switchStream(\'' + b.mediaId + '\')">' + label + '</button>';
+            html += '<button class="' + cls + '" onclick="switchStream(\'' + b.mediaId + '\',\'' + b.mediaType + '\')">' + label + '</button>';
           } else {
             html += '<div class="' + cls + '">' + label + '</div>';
           }
@@ -370,9 +374,9 @@ video {
   }
 
   // Switch stream
-  window.switchStream = function(mediaId) {
+  window.switchStream = function(mediaId, mediaType) {
     currentMediaId = mediaId;
-    var url = buildStreamURL(mediaId);
+    var url = buildStreamURL(mediaId, mediaType);
     loadStream(url);
     // Update active state
     var items = streamList.querySelectorAll('.stream-item');
