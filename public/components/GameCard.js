@@ -8,7 +8,7 @@ export default {
     <a class="game-card" :class="cardClasses" :style="cardStyle" :href="cardLink">
       <div class="card-strip"></div>
 
-      <div class="blackout-overlay" v-if="isFullyBlackedOut">
+      <div class="blackout-overlay" v-if="isFullyBlackedOut || hasNoPlayableStream">
         <span class="blackout-label">Not Available</span>
         <span class="blackout-reason" v-if="blackoutReason">{{ blackoutReason }}</span>
       </div>
@@ -88,7 +88,7 @@ export default {
         'is-free': this.game.isFreeGame && !this.game.isFavorite,
         'is-live': this.game.status.abstractGameState === 'Live',
         'is-final': this.game.status.abstractGameState === 'Final',
-        'game-card--blacked-out': this.isFullyBlackedOut,
+        'game-card--blacked-out': this.isFullyBlackedOut || this.hasNoPlayableStream,
         'game-card--audio-only': this.isAudioOnly
       }
     },
@@ -108,15 +108,22 @@ export default {
         this.filteredBroadcasts.find(b => b.isActive) ||
         this.filteredBroadcasts[0] || null
     },
+    allActiveBroadcasts() {
+      return this.game.broadcasts.filter(b =>
+        !b.isBlackedOut && (b.mediaStateCode === 'MEDIA_ON' || b.mediaStateCode === 'MEDIA_ARCHIVE' || this.game.status.abstractGameState === 'Final')
+      )
+    },
     isFullyBlackedOut() {
-      const fb = this.filteredBroadcasts
-      return fb.length > 0 && fb.every(b => b.isBlackedOut)
+      return this.game.broadcasts.length > 0 && this.game.broadcasts.every(b => b.isBlackedOut)
+    },
+    hasNoPlayableStream() {
+      if (this.game.status.abstractGameState === 'Preview') return false
+      return this.allActiveBroadcasts.length === 0
     },
     blackoutReason() {
-      const fb = this.filteredBroadcasts
-      if (fb.length === 0) return ''
-      const first = fb.find(b => b.blackoutType)
-      if (!first) return ''
+      if (this.game.broadcasts.length === 0) return 'No streams available'
+      const first = this.game.broadcasts.find(b => b.blackoutType)
+      if (!first) return 'No streams available'
       if (first.blackoutType === 'Not entitled') return 'Not entitled'
       let reason = 'Regional blackout'
       if (first.blackoutExpiry) {
@@ -125,12 +132,12 @@ export default {
       return reason
     },
     isAudioOnly() {
-      const hasVideo = this.game.broadcasts.some(b => b.mediaType === 'MLBTV' && b.language === 'en')
-      return !hasVideo && this.game.broadcasts.some(b => b.mediaType === 'Audio')
+      const hasVideo = this.game.broadcasts.some(b => b.mediaType === 'MLBTV' && b.language === 'en' && !b.isBlackedOut)
+      return !hasVideo && this.game.broadcasts.some(b => b.mediaType === 'Audio' && !b.isBlackedOut)
     },
     cardLink() {
       if (!this.cfg) return '#'
-      if (this.isFullyBlackedOut) return '#'
+      if (this.isFullyBlackedOut || this.hasNoPlayableStream) return '#'
       const hr = this.cfg.httpRoot
       let qs = '?gamePk=' + this.game.gamePk
       if (this.state.gamesData) qs += '&date=' + this.state.gamesData.gameDate
