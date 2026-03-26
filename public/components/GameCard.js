@@ -24,7 +24,7 @@ export default {
               <span style="color: var(--text-muted); font-size: 0.7em;">-</span>
               <span>{{ game.home.score }}</span>
             </div>
-            <img class="matchup-vs" src="/app/logos/vs.svg" alt="vs" v-else>
+            <span class="matchup-vs" v-else>VS</span>
           </div>
           <img class="team-logo" :src="homeLogoUrl" :alt="game.home.abbreviation" loading="lazy" @error="onLogoError">
         </div>
