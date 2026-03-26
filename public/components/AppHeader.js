@@ -10,7 +10,7 @@ export default {
         </div>
 
         <div class="header-right">
-          <button class="hamburger" :class="{ open: state.menuOpen }" @click="state.menuOpen = !state.menuOpen" title="Options">
+          <button class="hamburger" :class="{ open: state.menuOpen }" @click="state.menuOpen = !state.menuOpen; sessionStorage.setItem('menuOpen', state.menuOpen)" title="Options">
             <span></span><span></span><span></span>
           </button>
         </div>

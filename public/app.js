@@ -31,8 +31,8 @@ const state = reactive({
   // Loading state
   loading: true,
 
-  // Menu open state
-  menuOpen: false,
+  // Menu open state (persisted to sessionStorage)
+  menuOpen: sessionStorage.getItem('menuOpen') === 'true',
 
   // Filter state
   date: '',
