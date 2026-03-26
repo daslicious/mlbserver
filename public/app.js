@@ -167,6 +167,7 @@ const actions = {
 
   getLinkPath() {
     const lt = state.linkType
+    if (lt === 'Embed') return 'app/player.html'
     if (lt === 'Stream') return 'stream.m3u8'
     if (lt === 'Download') return 'download.ts'
     return lt.toLowerCase() + '.html'

@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>mlbserver</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg-deep: #06060a;
+  --bg-bar: rgba(11, 11, 18, 0.92);
+  --bg-surface: #1a1a24;
+  --border: #1c1c28;
+  --text-primary: #eae8e4;
+  --text-secondary: #9895a0;
+  --text-muted: #5c596a;
+  --amber: #e8a84c;
+  --amber-dim: #b07830;
+  --amber-glow: rgba(232, 168, 76, 0.08);
+  --radius-sm: 6px;
+  --font: 'Outfit', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'Menlo', monospace;
+  --ease: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  font-family: var(--font);
+  overflow: hidden;
+}
+
+/* Video container — fills viewport, centers video */
+.player-viewport {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+}
+
+video {
+  width: 100%;
+  max-width: 1280px;
+  height: auto;
+  max-height: 100vh;
+  outline: none;
+  background: #000;
+}
+
+/* Control bar — fixed bottom, fades on idle */
+.controls {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  background: var(--bg-bar);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid var(--border);
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  transition: opacity 400ms var(--ease), transform 400ms var(--ease);
+}
+
+/* Warm glow on top edge */
+.controls::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: 10%;
+  right: 10%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--amber-dim), transparent);
+  opacity: 0.4;
+}
+
+.controls.hidden {
+  opacity: 0;
+  transform: translateY(8px);
+  pointer-events: none;
+}
+
+.controls.force-hidden {
+  display: none;
+}
+
+/* Shared button style */
+.ctrl-btn {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 500;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 150ms var(--ease);
+  white-space: nowrap;
+  user-select: none;
+  line-height: 1;
+}
+.ctrl-btn:hover {
+  border-color: #2a2a3a;
+  color: var(--text-secondary);
+  background: var(--bg-surface);
+}
+.ctrl-btn.active {
+  color: var(--amber);
+  border-color: var(--amber-dim);
+  background: var(--amber-glow);
+}
+
+/* Back button */
+.back-btn {
+  font-family: var(--font);
+  font-weight: 500;
+  font-size: 0.75rem;
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 150ms var(--ease);
+  margin-right: 6px;
+}
+.back-btn:hover { color: var(--text-secondary); border-color: #2a2a3a; }
+
+/* Divider */
+.ctrl-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+/* Rate group */
+.rate-group { display: flex; gap: 2px; }
+
+/* Audio tracks */
+.audio-group { display: flex; gap: 2px; margin-left: auto; }
+
+/* Loading state */
+.loading-msg {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+  pointer-events: none;
+}
+.loading-msg span {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  opacity: 0;
+  animation: fade-in 600ms 500ms forwards;
+}
+
+@keyframes fade-in {
+  to { opacity: 1; }
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .controls { padding: 6px 10px; gap: 4px; }
+  .ctrl-btn { font-size: 0.65rem; padding: 4px 7px; }
+  .back-btn { font-size: 0.68rem; padding: 4px 8px; }
+}
+</style>
+</head>
+<body>
+
+<div class="player-viewport">
+  <video id="video" playsinline muted></video>
+</div>
+
+<div class="loading-msg" id="loadingMsg"><span>Loading stream...</span></div>
+
+<div class="controls" id="controls">
+  <button class="back-btn" onclick="goBack()">Back</button>
+  <div class="ctrl-sep"></div>
+  <button class="ctrl-btn" onclick="skip(-30)">-30s</button>
+  <button class="ctrl-btn" onclick="skip(-10)">-10s</button>
+  <button class="ctrl-btn" onclick="skip(10)">+10s</button>
+  <button class="ctrl-btn" onclick="skip(30)">+30s</button>
+  <div class="ctrl-sep"></div>
+  <div class="rate-group" id="rateGroup">
+    <button class="ctrl-btn" onclick="setRate(0.5)">0.5x</button>
+    <button class="ctrl-btn active" onclick="setRate(1)">1x</button>
+    <button class="ctrl-btn" onclick="setRate(1.25)">1.25x</button>
+    <button class="ctrl-btn" onclick="setRate(1.5)">1.5x</button>
+    <button class="ctrl-btn" onclick="setRate(2)">2x</button>
+  </div>
+  <div class="ctrl-sep"></div>
+  <button class="ctrl-btn" id="muteBtn" onclick="toggleMute()">Unmute</button>
+  <button class="ctrl-btn" id="airplayBtn" onclick="doAirPlay()" style="display:none">AirPlay</button>
+  <div class="audio-group" id="audioGroup"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<script>
+(function() {
+  var video = document.getElementById('video');
+  var controls = document.getElementById('controls');
+  var loadingMsg = document.getElementById('loadingMsg');
+  var muteBtn = document.getElementById('muteBtn');
+  var airplayBtn = document.getElementById('airplayBtn');
+  var audioGroup = document.getElementById('audioGroup');
+  var rateGroup = document.getElementById('rateGroup');
+
+  // Parse query params
+  var params = new URLSearchParams(window.location.search);
+  var startFrom = params.get('startFrom') || 'Beginning';
+  var showControls = params.get('controls') !== 'Hide';
+  var contentProtect = params.get('content_protect') || '';
+
+  // Build stream URL
+  var streamURL = '';
+  if (params.get('src')) {
+    streamURL = params.get('src');
+  } else if (params.get('msrc')) {
+    streamURL = '/stream.m3u8?src=' + encodeURIComponent(params.get('msrc'));
+  } else if (params.get('mediaId')) {
+    streamURL = '/stream.m3u8?mediaId=' + params.get('mediaId');
+    // Pass through extra params
+    var passthrough = ['resolution', 'audio_track', 'captions', 'skip', 'skip_adjust', 'pad', 'force_vod', 'inning_half', 'inning_number', 'gamePk'];
+    passthrough.forEach(function(key) {
+      var val = params.get(key);
+      if (val) streamURL += '&' + key + '=' + encodeURIComponent(val);
+    });
+  } else if (params.get('highlight_src')) {
+    streamURL = params.get('highlight_src');
+  }
+
+  // Append content protect
+  if (contentProtect && streamURL) {
+    streamURL += (streamURL.indexOf('?') >= 0 ? '&' : '?') + 'content_protect=' + contentProtect;
+  }
+
+  // Hide controls if requested
+  if (!showControls) {
+    controls.classList.add('force-hidden');
+  }
+
+  // AirPlay
+  if (window.WebKitPlaybackTargetAvailabilityEvent) {
+    airplayBtn.style.display = '';
+  }
+
+  // HLS setup
+  if (Hls.isSupported() && streamURL) {
+    var hlsConfig = {};
+    if (startFrom === 'Live') {
+      hlsConfig.liveSyncDuration = 32400;
+    }
+    var hls = new Hls(hlsConfig);
+    hls.loadSource(streamURL);
+    hls.attachMedia(video);
+
+    hls.on(Hls.Events.MANIFEST_PARSED, function() {
+      loadingMsg.style.display = 'none';
+      video.play().then(function() {
+        if (startFrom === 'Beginning') {
+          video.currentTime = 0;
+        }
+      }).catch(function() {});
+    });
+
+    hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, function(event, data) {
+      audioGroup.innerHTML = '';
+      if (data.audioTracks.length > 1) {
+        var sep = document.createElement('div');
+        sep.className = 'ctrl-sep';
+        audioGroup.insertAdjacentElement('beforebegin', sep);
+        data.audioTracks.forEach(function(track, i) {
+          var btn = document.createElement('button');
+          btn.className = 'ctrl-btn' + (i === hls.audioTrack ? ' active' : '');
+          btn.textContent = track.name || ('Audio ' + (i + 1));
+          btn.onclick = function() {
+            hls.audioTrack = i;
+            updateAudioButtons(i);
+          };
+          audioGroup.appendChild(btn);
+        });
+      }
+    });
+
+    hls.on(Hls.Events.ERROR, function(event, data) {
+      if (data.fatal) {
+        loadingMsg.querySelector('span').textContent = 'Stream error';
+      }
+    });
+
+    window._hls = hls;
+  } else if (video.canPlayType('application/vnd.apple.mpegurl') && streamURL) {
+    // Native HLS (Safari)
+    video.src = streamURL;
+    video.addEventListener('loadedmetadata', function() {
+      loadingMsg.style.display = 'none';
+      video.play().catch(function() {});
+    });
+  }
+
+  // Controls: skip
+  window.skip = function(seconds) {
+    video.currentTime = Math.max(0, video.currentTime + seconds);
+  };
+
+  // Controls: rate
+  window.setRate = function(rate) {
+    video.playbackRate = rate;
+    var btns = rateGroup.querySelectorAll('.ctrl-btn');
+    btns.forEach(function(b) {
+      b.classList.toggle('active', parseFloat(b.textContent) === rate);
+    });
+  };
+
+  // Controls: mute
+  window.toggleMute = function() {
+    video.muted = !video.muted;
+    muteBtn.textContent = video.muted ? 'Unmute' : 'Mute';
+    muteBtn.classList.toggle('active', !video.muted);
+  };
+
+  // Controls: AirPlay
+  window.doAirPlay = function() {
+    if (video.webkitShowPlaybackTargetPicker) {
+      video.webkitShowPlaybackTargetPicker();
+    }
+  };
+
+  // Controls: audio track buttons
+  function updateAudioButtons(activeIndex) {
+    var btns = audioGroup.querySelectorAll('.ctrl-btn');
+    btns.forEach(function(b, i) {
+      b.classList.toggle('active', i === activeIndex);
+    });
+  }
+
+  // Back
+  window.goBack = function() {
+    if (window.history.length > 1) {
+      window.history.back();
+    } else {
+      window.location.href = '/';
+    }
+  };
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', function(e) {
+    switch (e.key) {
+      case 'ArrowRight': skip(10); e.preventDefault(); break;
+      case 'ArrowLeft': skip(-10); e.preventDefault(); break;
+      case 'ArrowUp':
+        video.playbackRate = Math.min(16, Math.round((video.playbackRate + 0.1) * 10) / 10);
+        e.preventDefault();
+        break;
+      case 'ArrowDown':
+        video.playbackRate = Math.max(0.1, Math.round((video.playbackRate - 0.1) * 10) / 10);
+        e.preventDefault();
+        break;
+      case ' ':
+        if (video.paused) video.play(); else video.pause();
+        e.preventDefault();
+        break;
+    }
+  });
+
+  // Auto-hide controls on idle (mouse not moving)
+  var hideTimer;
+  function showControls() {
+    controls.classList.remove('hidden');
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(function() {
+      if (!video.paused) controls.classList.add('hidden');
+    }, 3000);
+  }
+
+  document.addEventListener('mousemove', showControls);
+  document.addEventListener('touchstart', showControls);
+  video.addEventListener('pause', function() { controls.classList.remove('hidden'); });
+  video.addEventListener('play', function() {
+    hideTimer = setTimeout(function() { controls.classList.add('hidden'); }, 3000);
+    // Unmute after first play
+    if (video.muted) {
+      video.muted = false;
+      muteBtn.textContent = 'Mute';
+      muteBtn.classList.add('active');
+    }
+  });
+
+  // Initial show
+  showControls();
+})();
+</script>
+</body>
+</html>

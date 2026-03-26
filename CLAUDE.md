@@ -26,16 +26,33 @@ Default port is 9999. Multiview port defaults to primary port + 1.
 
 ## Architecture
 
-The entire application is two files:
+The backend is two large files:
 
-- **`index.js`** (~3800 lines) — HTTP server using the `root` framework. Defines all route handlers and serves the web UI (HTML generated inline). Handles HLS stream proxying, playlist manipulation (resolution filtering, skip markers, captions), multiview via ffmpeg, and gamechanger features.
-- **`session.js`** (~5600 lines) — `sessionClass` that manages all MLB API interaction. Handles authentication (GraphQL to `media-gateway.mlb.com`), game schedule lookups, media ID resolution, stream URL retrieval, skip/break marker calculation, IPTV channel/guide generation, and persistent state (credentials, cookies, cache stored as JSON files on disk).
+- **`index.js`** (~4200 lines) — HTTP server using the `root` framework. Defines all route handlers, serves both the new SPA and old inline-HTML UI, handles HLS stream proxying, playlist manipulation (resolution filtering, skip markers, captions), multiview via ffmpeg, and gamechanger features.
+- **`session.js`** (~5700 lines) — `sessionClass` that manages all MLB API interaction. Handles authentication (GraphQL to `media-gateway.mlb.com`), game schedule lookups, media ID resolution, stream URL retrieval, skip/break marker calculation, IPTV channel/guide generation, and persistent state (credentials, cookies, cache stored as JSON files on disk).
+
+### Frontend (public/)
+
+A Vue 3 SPA (loaded from CDN, no build step) served at `/` with static files at `/app/*`. Components use ES module imports (no bundler). Key files:
+
+- `public/index.html` — Shell HTML, loads Vue and `app.js`
+- `public/app.js` — Creates Vue app, manages reactive global `state`, fetches from `/api/*`
+- `public/style.css` — All styles
+- `public/components/` — Vue components: `AppHeader`, `FilterBar`, `VideoOptions`, `GameTable`, `GameCard`, `SpecialStreams`, `MultiviewPanel`, `ExportLinks`, `HighlightsModal`
+- `public/logos/` — Team SVG logos (by team ID number, e.g. `108.svg`)
+
+The old server-rendered UI is still available at `/old`.
 
 ### Key Route Endpoints (index.js)
 
 | Route | Purpose |
 |---|---|
-| `/` | Main web UI — game listings with date/team/level selectors |
+| `/` | New Vue SPA frontend |
+| `/old` | Legacy server-rendered HTML UI |
+| `/app/*` | Static file serving for SPA (from `public/` directory) |
+| `/api/config` | Server config and valid options for SPA |
+| `/api/games` | Game data JSON for SPA |
+| `/api/settings` | GET/POST user preferences for SPA |
 | `/stream.m3u8` | Primary stream endpoint — resolves team/game to HLS stream |
 | `/master.m3u8` | Master playlist proxy with resolution/audio filtering |
 | `/playlist.m3u8` | Media playlist proxy with skip marker injection |
