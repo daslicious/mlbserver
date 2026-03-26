@@ -3167,26 +3167,45 @@ class sessionClass {
       var response = await this.httpGet(reqObj, false)
       if ( response ) {
         // Strip trademark (TM) and registered (R) glyphs from SVG logos
-        // These are short trailing <path> elements just before </svg>
         let cleaned = response.toString()
+        // Pass 1: strip short trailing <path> elements (separate TM/R paths)
         for (let pass = 0; pass < 2; pass++) {
           let svgEnd = cleaned.lastIndexOf('</svg>')
           if (svgEnd < 0) break
           let before = cleaned.substring(0, svgEnd)
           let lastPathStart = before.lastIndexOf('<path')
           if (lastPathStart < 0) break
-          // Find the end of this <path .../> element
           let lastPathEnd = cleaned.indexOf('/>', lastPathStart)
           if (lastPathEnd < 0) break
-          lastPathEnd += 2 // include the '/>'
+          lastPathEnd += 2
           let pathStr = cleaned.substring(lastPathStart, lastPathEnd)
-          // Only strip if this path element is short (TM/R glyph, not main logo)
           if (pathStr.length < 350) {
             cleaned = cleaned.substring(0, lastPathStart) + cleaned.substring(lastPathEnd)
           } else {
             break
           }
         }
+        // Pass 2: strip embedded TM/R sub-paths within d attributes
+        // These are short trailing sub-paths (after z) that draw tiny glyphs
+        cleaned = cleaned.replace(/\sd="([^"]+)"/g, function(match, d) {
+          let parts = d.split(/(?<=z)/)
+          if (parts.length <= 2) return match
+          // Check if trailing sub-paths are short glyph fragments
+          let totalTrailing = 0
+          let cutIndex = parts.length
+          for (let i = parts.length - 1; i >= 2; i--) {
+            if (parts[i].length < 200) {
+              totalTrailing += parts[i].length
+              cutIndex = i
+            } else {
+              break
+            }
+          }
+          if (totalTrailing > 0 && totalTrailing < 600) {
+            return ' d="' + parts.slice(0, cutIndex).join('') + '"'
+          }
+          return match
+        })
         response = cleaned
         this.debuglog('getImage response : ' + response)
         fs.writeFileSync(imagePath, response)
