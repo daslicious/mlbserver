@@ -8,12 +8,11 @@ export default {
     <a class="game-card" :class="cardClasses" :style="cardStyle" :href="cardLink">
       <div class="card-strip"></div>
 
-      <div class="blackout-overlay" v-if="isFullyBlackedOut || hasNoPlayableStream">
+      <div class="blackout-overlay" v-if="hasNoActiveStream">
         <span class="blackout-label">Not Available</span>
-        <span class="blackout-reason" v-if="blackoutReason">{{ blackoutReason }}</span>
       </div>
 
-      <div class="audio-overlay" v-if="isAudioOnly && !isFullyBlackedOut"></div>
+      <div class="audio-overlay" v-if="isAudioOnly && !hasNoActiveStream"></div>
 
       <div class="card-inner">
         <div class="card-matchup">
@@ -88,7 +87,7 @@ export default {
         'is-free': this.game.isFreeGame && !this.game.isFavorite,
         'is-live': this.game.status.abstractGameState === 'Live',
         'is-final': this.game.status.abstractGameState === 'Final',
-        'game-card--blacked-out': this.isFullyBlackedOut || this.hasNoPlayableStream,
+        'game-card--blacked-out': this.hasNoActiveStream,
         'game-card--audio-only': this.isAudioOnly
       }
     },
@@ -104,32 +103,21 @@ export default {
       }))
     },
     homeBroadcast() {
-      return this.filteredBroadcasts.find(b => b.homeAway === 'home' && b.isActive) ||
+      // Prefer non-blacked-out home feed, then any non-blacked-out, then any active feed
+      return this.filteredBroadcasts.find(b => b.homeAway === 'home' && b.isActive && !b.isBlackedOut) ||
+        this.filteredBroadcasts.find(b => b.isActive && !b.isBlackedOut) ||
+        this.filteredBroadcasts.find(b => b.homeAway === 'home' && b.isActive) ||
         this.filteredBroadcasts.find(b => b.isActive) ||
         this.filteredBroadcasts[0] || null
     },
     allActiveBroadcasts() {
       return this.game.broadcasts.filter(b =>
-        !b.isBlackedOut && (b.mediaStateCode === 'MEDIA_ON' || b.mediaStateCode === 'MEDIA_ARCHIVE' || this.game.status.abstractGameState === 'Final')
+        b.mediaStateCode === 'MEDIA_ON' || b.mediaStateCode === 'MEDIA_ARCHIVE' || this.game.status.abstractGameState === 'Final'
       )
     },
-    isFullyBlackedOut() {
-      return this.game.broadcasts.length > 0 && this.game.broadcasts.every(b => b.isBlackedOut)
-    },
-    hasNoPlayableStream() {
+    hasNoActiveStream() {
       if (this.game.status.abstractGameState === 'Preview') return false
-      return this.allActiveBroadcasts.length === 0
-    },
-    blackoutReason() {
-      if (this.game.broadcasts.length === 0) return 'No streams available'
-      const first = this.game.broadcasts.find(b => b.blackoutType)
-      if (!first) return 'No streams available'
-      if (first.blackoutType === 'Not entitled') return 'Not entitled'
-      let reason = 'Regional blackout'
-      if (first.blackoutExpiry) {
-        reason += ' until ~' + new Date(first.blackoutExpiry).toLocaleString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true })
-      }
-      return reason
+      return this.game.broadcasts.length === 0 || this.allActiveBroadcasts.length === 0
     },
     isAudioOnly() {
       const hasVideo = this.game.broadcasts.some(b => b.mediaType === 'MLBTV' && b.language === 'en' && !b.isBlackedOut)
@@ -137,7 +125,7 @@ export default {
     },
     cardLink() {
       if (!this.cfg) return '#'
-      if (this.isFullyBlackedOut || this.hasNoPlayableStream) return '#'
+      if (this.hasNoActiveStream) return '#'
       const hr = this.cfg.httpRoot
       let qs = '?gamePk=' + this.game.gamePk
       if (this.state.gamesData) qs += '&date=' + this.state.gamesData.gameDate
