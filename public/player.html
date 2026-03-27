@@ -258,7 +258,7 @@ video:not([data-has-video]) {
 
     if (hls) { hls.destroy(); hls = null; }
     video.removeAttribute('data-has-video');
-    video.controls = false;
+    video.controls = true;
 
     if (Hls.isSupported()) {
       var hlsConfig = {};
@@ -331,11 +331,10 @@ video:not([data-has-video]) {
           var isActive = b.mediaStateCode === 'MEDIA_ON' || b.mediaStateCode === 'MEDIA_ARCHIVE' || game.status.abstractGameState === 'Final';
           var cls = 'stream-item';
           if (b.mediaId === currentMediaId) cls += ' active';
-          if (b.isBlackedOut) cls += ' blacked';
-          if (isActive && !b.isBlackedOut) {
+          if (isActive) {
             html += '<button class="' + cls + '" onclick="switchStream(\'' + b.mediaId + '\',\'' + b.mediaType + '\')">' + label + '</button>';
           } else {
-            html += '<div class="' + cls + '">' + label + (b.isBlackedOut ? ' (blacked out)' : '') + '</div>';
+            html += '<div class="' + cls + '">' + label + '</div>';
           }
         });
       }
@@ -347,8 +346,7 @@ video:not([data-has-video]) {
           var isActive = b.mediaStateCode === 'MEDIA_ON' || b.mediaStateCode === 'MEDIA_ARCHIVE' || game.status.abstractGameState === 'Final';
           var cls = 'stream-item';
           if (b.mediaId === currentMediaId) cls += ' active';
-          if (b.isBlackedOut) cls += ' blacked';
-          if (isActive && !b.isBlackedOut) {
+          if (isActive) {
             html += '<button class="' + cls + '" onclick="switchStream(\'' + b.mediaId + '\',\'' + b.mediaType + '\')">' + label + '</button>';
           } else {
             html += '<div class="' + cls + '">' + label + '</div>';
@@ -363,8 +361,7 @@ video:not([data-has-video]) {
           var isActive = b.mediaStateCode === 'MEDIA_ON' || b.mediaStateCode === 'MEDIA_ARCHIVE' || game.status.abstractGameState === 'Final';
           var cls = 'stream-item';
           if (b.mediaId === currentMediaId) cls += ' active';
-          if (b.isBlackedOut) cls += ' blacked';
-          if (isActive && !b.isBlackedOut) {
+          if (isActive) {
             html += '<button class="' + cls + '" onclick="switchStream(\'' + b.mediaId + '\',\'' + b.mediaType + '\')">' + label + '</button>';
           } else {
             html += '<div class="' + cls + '">' + label + '</div>';
