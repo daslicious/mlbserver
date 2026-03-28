@@ -288,9 +288,19 @@ video:not([data-has-video]) {
             return;
           }
         }
-        video.play().then(function() {
-          if (startFrom === 'Beginning') video.currentTime = 0;
-        }).catch(function() {});
+        // Autoplay once data is buffered
+        video.addEventListener('canplay', function onCanPlay() {
+          video.removeEventListener('canplay', onCanPlay);
+          video.play().then(function() {
+            if (startFrom === 'Beginning') video.currentTime = 0;
+          }).catch(function() {});
+        });
+        // Also try immediately in case already buffered
+        if (video.readyState >= 3) {
+          video.play().then(function() {
+            if (startFrom === 'Beginning') video.currentTime = 0;
+          }).catch(function() {});
+        }
       });
       hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, function(event, data) {
         audioGroup.innerHTML = '';
