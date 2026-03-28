@@ -289,17 +289,24 @@ video:not([data-has-video]) {
           }
         }
         // Autoplay once data is buffered
+        function seekToStart() {
+          if (startFrom === 'Live') {
+            // Seek to live edge — near the end of available duration
+            if (video.duration && isFinite(video.duration)) {
+              video.currentTime = video.duration - 10;
+            } else if (hls.liveSyncPosition) {
+              video.currentTime = hls.liveSyncPosition;
+            }
+          } else if (startFrom === 'Beginning') {
+            video.currentTime = 0;
+          }
+        }
         video.addEventListener('canplay', function onCanPlay() {
           video.removeEventListener('canplay', onCanPlay);
-          video.play().then(function() {
-            if (startFrom === 'Beginning') video.currentTime = 0;
-          }).catch(function() {});
+          video.play().then(seekToStart).catch(function() {});
         });
-        // Also try immediately in case already buffered
         if (video.readyState >= 3) {
-          video.play().then(function() {
-            if (startFrom === 'Beginning') video.currentTime = 0;
-          }).catch(function() {});
+          video.play().then(seekToStart).catch(function() {});
         }
       });
       hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, function(event, data) {
