@@ -53,8 +53,8 @@ video {
   object-fit: contain;
 }
 video:not([data-has-video]) {
-  height: 80px;
-  max-width: 800px;
+  height: 120px;
+  max-width: 900px;
   background: var(--bg-card);
   border-radius: var(--radius-sm);
   object-fit: initial;
@@ -273,6 +273,20 @@ video:not([data-has-video]) {
         } else {
           video.removeAttribute('data-has-video');
           video.controls = true;
+          // Reload with force_vod for audio streams so they get a seekable timeline
+          if (url.indexOf('force_vod') === -1) {
+            var vodUrl = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'force_vod=on';
+            hls.destroy();
+            hls = new Hls(hlsConfig);
+            hls.loadSource(vodUrl);
+            hls.attachMedia(video);
+            hls.on(Hls.Events.MANIFEST_PARSED, function() {
+              video.controls = true;
+              video.play().catch(function() {});
+            });
+            window._hls = hls;
+            return;
+          }
         }
         video.play().then(function() {
           if (startFrom === 'Beginning') video.currentTime = 0;
