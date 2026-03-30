@@ -118,6 +118,15 @@ function syncURL() {
 }
 
 // API calls
+// Wrap fetch to strip credentials from URLs (fixes basic auth in URL breaking fetch)
+const _origFetch = window.fetch
+window.fetch = function(input, init) {
+  if (typeof input === 'string' && input.startsWith('/')) {
+    input = window.location.origin + input
+  }
+  return _origFetch.call(this, input, init)
+}
+
 async function fetchConfig() {
   try {
     const cp = state.config ? state.config.contentProtect : ''

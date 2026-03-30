@@ -191,6 +191,15 @@ video:not([data-has-video]) {
 
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <script>
+// Wrap fetch to strip credentials from URLs (fixes basic auth in URL breaking fetch)
+var _origFetch = window.fetch;
+window.fetch = function(input, init) {
+  if (typeof input === 'string' && input.startsWith('/')) {
+    input = window.location.origin + input;
+  }
+  return _origFetch.call(this, input, init);
+};
+
 (function() {
   var video = document.getElementById('video');
   var controls = document.getElementById('controls');
