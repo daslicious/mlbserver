@@ -40,6 +40,7 @@ const DEFAULT_MULTIVIEW_AUDIO_TRACK = 'English'
 const VALID_CAPTIONS = [ 'enabled', 'disabled' ]
 const VALID_SKIP = [ 'off', 'breaks', 'idle time', 'pitches', 'commercials' ]
 const DEFAULT_SKIP_ADJUST = 0
+const DEFAULT_AUDIO_OFFSET = -5
 const VALID_PAD = [ 'off', 'on' ]
 const VALID_FORCE_VOD = [ 'off', 'on' ]
 const VALID_SCAN_MODES = [ 'off', 'on' ]
@@ -718,6 +719,14 @@ app.get('/stream.m3u8', async function(req, res) {
       options.inning_number = req.query.inning_number || VALID_INNING_NUMBER[0]
       options.skip = req.query.skip || VALID_SKIP[0]
       options.pad = req.query.pad || VALID_PAD[0]
+      // Auto-apply default audio offset for radio tracks to sync with video
+      if ( req.query.audio_offset !== undefined ) {
+        options.audio_offset = parseFloat(req.query.audio_offset) || 0
+      } else if ( VALID_AUDIO_TRACKS.slice(2, 6).includes(options.audio_track) ) {
+        options.audio_offset = DEFAULT_AUDIO_OFFSET
+      } else {
+        options.audio_offset = 0
+      }
       if ( options.pad != VALID_PAD[0] ) {
         // if pad is selected, pick a random number of times to repeat the last segment (between 1-3 hours)
         options.pad = Math.floor(Math.random() * (7200 / SECONDS_PER_SEGMENT)) + (3600 / SECONDS_PER_SEGMENT)
@@ -990,6 +999,7 @@ function getMasterPlaylist(streamURL, req, res, options = {}) {
       let skip_adjust = options.skip_adjust || DEFAULT_SKIP_ADJUST
       let pad = options.pad || VALID_PAD[0]
       let gamePk = options.gamePk || false
+      let audio_offset = options.audio_offset || 0
 
       if ( (inning_number > 0) && (inning_half == VALID_INNING_HALF[0]) ) {
         inning_half = VALID_INNING_HALF[1]
@@ -1182,6 +1192,7 @@ function getMasterPlaylist(streamURL, req, res, options = {}) {
           if ( pad != VALID_PAD[0] ) newurl += '&pad=' + pad
           if ( gamePk ) newurl += '&gamePk=' + gamePk
           if ( audio_track != VALID_AUDIO_TRACKS[0] ) newurl += '&audio_track=' + encodeURIComponent(audio_track)
+          if ( audio_offset ) newurl += '&audio_offset=' + audio_offset
           newurl += content_protect + referer_parameter + token_parameter
           return http_root + '/playlist.m3u8?url='+newurl
         }
@@ -1239,6 +1250,7 @@ app.get('/playlist.m3u8', async function(req, res) {
   var pad = req.query.pad || VALID_PAD[0]
   var gamePk = req.query.gamePk || false
   var audio_track = req.query.audio_track || VALID_AUDIO_TRACKS[0]
+  var audio_offset = parseFloat(req.query.audio_offset) || 0
 
   var req = function () {
     var headers = {}
@@ -1336,6 +1348,13 @@ app.get('/playlist.m3u8', async function(req, res) {
             if (parsed[2]) iv = parsed[2].slice(2).toLowerCase()
           }
           return null
+        }
+
+        // Shift video PROGRAM-DATE-TIME to sync with radio audio offset
+        if ( audio_offset && line.startsWith('#EXT-X-PROGRAM-DATE-TIME:') ) {
+          let pdt = new Date(line.substring(25))
+          pdt.setMilliseconds(pdt.getMilliseconds() - (audio_offset * 1000))
+          return '#EXT-X-PROGRAM-DATE-TIME:' + pdt.toISOString()
         }
 
         if (line[0] === '#') return line

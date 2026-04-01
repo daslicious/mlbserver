@@ -199,6 +199,8 @@ const app = createApp({
       await fetchConfig()
       restoreState() // Re-apply after config loads
       await fetchGames()
+      // Refresh game data every 2 minutes so game states stay current
+      setInterval(fetchGames, 2 * 60 * 1000)
     })
     return { state }
   }

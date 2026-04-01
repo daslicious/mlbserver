@@ -142,11 +142,11 @@ export default {
         qs += '&inning_number=' + Math.max(0, parseInt(s.inningNumber) - (9 - sched))
       }
       if (s.pad !== this.cfg.validOptions.pad[0]) qs += '&pad=' + s.pad
-      // Live games always start at the live point
-      if (this.game.status.abstractGameState === 'Live') {
+      // Live and upcoming games start at the live point; final games start at the beginning
+      if (this.game.status.abstractGameState === 'Final') {
+        qs += '&startFrom=Beginning'
+      } else {
         qs += '&startFrom=Live'
-      } else if (s.startFrom !== this.cfg.validOptions.startFrom[0]) {
-        qs += '&startFrom=' + s.startFrom
       }
       if (s.controls !== this.cfg.validOptions.controls[0]) qs += '&controls=' + s.controls
       qs += this.actions.getContentProtectParam('&')
