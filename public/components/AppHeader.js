@@ -10,6 +10,11 @@ export default {
         </div>
 
         <div class="header-right">
+          <template v-if="state.username">
+            <span class="user-badge">{{ state.username }}</span>
+            <button class="user-logout" @click="actions.logout()">Logout</button>
+          </template>
+          <button v-else class="btn" @click="state.showLogin = true">Login</button>
           <button class="hamburger" :class="{ open: state.menuOpen }" @click="state.menuOpen = !state.menuOpen; sessionStorage.setItem('menuOpen', state.menuOpen)" title="Options">
             <span></span><span></span><span></span>
           </button>

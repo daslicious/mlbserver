@@ -252,6 +252,301 @@ function corsMiddleware(req, res, next) {
 httpAttach(multiview_app, corsMiddleware)
 multiview_app.listen(multiview_port)
 
+// ============================================
+// User management
+// ============================================
+var USERS_FILE = path.join(session.DATA_DIRECTORY, 'users.json')
+var INVITES_FILE = path.join(session.DATA_DIRECTORY, 'invites.json')
+var SESSIONS_FILE = path.join(session.DATA_DIRECTORY, 'sessions.json')
+
+function loadJsonFile(filePath, fallback) {
+  try { if (fs.existsSync(filePath)) return JSON.parse(fs.readFileSync(filePath, 'utf8')); } catch(e) {}
+  return fallback
+}
+function saveJsonFile(filePath, data) {
+  fs.writeFileSync(filePath, JSON.stringify(data, null, 2))
+}
+
+var users = loadJsonFile(USERS_FILE, {})
+var invites = loadJsonFile(INVITES_FILE, {})
+var sessions = new Map()
+// Load persisted sessions
+var savedSessions = loadJsonFile(SESSIONS_FILE, {})
+var now = Date.now()
+for (var tok in savedSessions) {
+  if (savedSessions[tok].expiresAt > now) sessions.set(tok, savedSessions[tok])
+}
+
+function saveSessions() {
+  var obj = {}
+  sessions.forEach(function(v, k) { obj[k] = v })
+  saveJsonFile(SESSIONS_FILE, obj)
+}
+
+function parseCookies(req) {
+  var cookies = {}
+  var header = req.headers.cookie || ''
+  header.split(';').forEach(function(c) {
+    var parts = c.trim().split('=')
+    if (parts.length >= 2) cookies[parts[0]] = parts.slice(1).join('=')
+  })
+  return cookies
+}
+
+function getUserFromRequest(req) {
+  var cookies = parseCookies(req)
+  var token = cookies.session
+  if (!token || !sessions.has(token)) return null
+  var sess = sessions.get(token)
+  if (sess.expiresAt < Date.now()) {
+    sessions.delete(token)
+    return null
+  }
+  var user = users[sess.username]
+  if (!user) return null
+  return { username: sess.username, role: user.role }
+}
+
+function hashPassword(password, salt) {
+  return crypto.scryptSync(password, salt, 64).toString('hex')
+}
+
+function verifyPassword(password, salt, hash) {
+  var derived = crypto.scryptSync(password, salt, 64)
+  return crypto.timingSafeEqual(derived, Buffer.from(hash, 'hex'))
+}
+
+function createSession(username) {
+  var token = crypto.randomBytes(32).toString('hex')
+  var expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000
+  sessions.set(token, { username: username, createdAt: Date.now(), expiresAt: expiresAt })
+  saveSessions()
+  return token
+}
+
+function setSessionCookie(res, token) {
+  res.setHeader('Set-Cookie', 'session=' + token + '; HttpOnly; Path=/; SameSite=Lax; Max-Age=604800')
+}
+
+function clearSessionCookie(res) {
+  res.setHeader('Set-Cookie', 'session=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0')
+}
+
+function jsonResponse(res, statusCode, data) {
+  res.setHeader('Content-Type', 'application/json')
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.writeHead(statusCode)
+  res.end(JSON.stringify(data))
+}
+
+// Prune expired sessions every hour
+setInterval(function() {
+  var n = Date.now()
+  sessions.forEach(function(v, k) { if (v.expiresAt < n) sessions.delete(k) })
+  saveSessions()
+}, 60 * 60 * 1000)
+
+// Auth: Register (requires invite code, or first user becomes admin)
+app.post('/api/auth/register', async function(req, res) {
+  try {
+    req.on('body', function(body) {
+      try {
+        var data = JSON.parse(body)
+        var username = (data.username || '').trim().toLowerCase()
+        var password = data.password || ''
+        var inviteCode = (data.inviteCode || '').trim()
+
+        if (!username || username.length < 2 || username.length > 30 || !/^[a-z0-9_]+$/.test(username)) {
+          return jsonResponse(res, 400, { error: 'Username must be 2-30 chars, lowercase letters/numbers/underscores' })
+        }
+        if (password.length < 4) {
+          return jsonResponse(res, 400, { error: 'Password must be at least 4 characters' })
+        }
+        if (users[username]) {
+          return jsonResponse(res, 409, { error: 'Username already taken' })
+        }
+
+        var isFirstUser = Object.keys(users).length === 0
+        if (!isFirstUser) {
+          if (!inviteCode || !invites[inviteCode]) {
+            return jsonResponse(res, 403, { error: 'Valid invite code required' })
+          }
+          if (invites[inviteCode].expiresAt && invites[inviteCode].expiresAt < Date.now()) {
+            delete invites[inviteCode]
+            saveJsonFile(INVITES_FILE, invites)
+            return jsonResponse(res, 403, { error: 'Invite code has expired' })
+          }
+          // Consume the invite
+          delete invites[inviteCode]
+          saveJsonFile(INVITES_FILE, invites)
+        }
+
+        var salt = crypto.randomBytes(16).toString('hex')
+        users[username] = {
+          role: isFirstUser ? 'admin' : 'user',
+          passwordHash: hashPassword(password, salt),
+          salt: salt,
+          createdAt: new Date().toISOString(),
+          preferences: {}
+        }
+        saveJsonFile(USERS_FILE, users)
+
+        var token = createSession(username)
+        setSessionCookie(res, token)
+        jsonResponse(res, 201, { username: username, role: users[username].role })
+      } catch(e) { jsonResponse(res, 400, { error: e.message }) }
+    })
+  } catch(e) { jsonResponse(res, 500, { error: e.message }) }
+})
+
+// Auth: Login
+app.post('/api/auth/login', async function(req, res) {
+  try {
+    req.on('body', function(body) {
+      try {
+        var data = JSON.parse(body)
+        var username = (data.username || '').trim().toLowerCase()
+        var password = data.password || ''
+        var user = users[username]
+        if (!user || !verifyPassword(password, user.salt, user.passwordHash)) {
+          return jsonResponse(res, 401, { error: 'Invalid username or password' })
+        }
+        var token = createSession(username)
+        setSessionCookie(res, token)
+        jsonResponse(res, 200, { username: username, role: user.role })
+      } catch(e) { jsonResponse(res, 400, { error: e.message }) }
+    })
+  } catch(e) { jsonResponse(res, 500, { error: e.message }) }
+})
+
+// Auth: Logout
+app.post('/api/auth/logout', async function(req, res) {
+  try {
+    var cookies = parseCookies(req)
+    if (cookies.session) {
+      sessions.delete(cookies.session)
+      saveSessions()
+    }
+    clearSessionCookie(res)
+    jsonResponse(res, 200, { success: true })
+  } catch(e) { jsonResponse(res, 500, { error: e.message }) }
+})
+
+// User: Get current user
+app.get('/api/user/me', async function(req, res) {
+  try {
+    var u = getUserFromRequest(req)
+    jsonResponse(res, 200, u ? { username: u.username, role: u.role } : { username: null })
+  } catch(e) { jsonResponse(res, 500, { error: e.message }) }
+})
+
+// User: Get preferences
+app.get('/api/user/preferences', async function(req, res) {
+  try {
+    var u = getUserFromRequest(req)
+    if (!u) return jsonResponse(res, 401, { error: 'Not logged in' })
+    jsonResponse(res, 200, users[u.username].preferences || {})
+  } catch(e) { jsonResponse(res, 500, { error: e.message }) }
+})
+
+// User: Save preferences
+app.post('/api/user/preferences', async function(req, res) {
+  try {
+    var u = getUserFromRequest(req)
+    if (!u) return jsonResponse(res, 401, { error: 'Not logged in' })
+    req.on('body', function(body) {
+      try {
+        var prefs = JSON.parse(body)
+        users[u.username].preferences = prefs
+        saveJsonFile(USERS_FILE, users)
+        jsonResponse(res, 200, { success: true })
+      } catch(e) { jsonResponse(res, 400, { error: e.message }) }
+    })
+  } catch(e) { jsonResponse(res, 500, { error: e.message }) }
+})
+
+// Admin: Generate invite
+app.post('/api/admin/invite', async function(req, res) {
+  try {
+    var u = getUserFromRequest(req)
+    if (!u || u.role !== 'admin') return jsonResponse(res, 403, { error: 'Admin only' })
+    var code = crypto.randomBytes(4).toString('hex')
+    invites[code] = {
+      createdBy: u.username,
+      createdAt: new Date().toISOString(),
+      expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000
+    }
+    saveJsonFile(INVITES_FILE, invites)
+    jsonResponse(res, 201, { code: code })
+  } catch(e) { jsonResponse(res, 500, { error: e.message }) }
+})
+
+// Admin: List invites
+app.get('/api/admin/invites', async function(req, res) {
+  try {
+    var u = getUserFromRequest(req)
+    if (!u || u.role !== 'admin') return jsonResponse(res, 403, { error: 'Admin only' })
+    var list = []
+    for (var code in invites) {
+      list.push({ code: code, createdBy: invites[code].createdBy, createdAt: invites[code].createdAt, expiresAt: invites[code].expiresAt })
+    }
+    jsonResponse(res, 200, list)
+  } catch(e) { jsonResponse(res, 500, { error: e.message }) }
+})
+
+// Admin: Revoke invite
+app.post('/api/admin/invite/revoke', async function(req, res) {
+  try {
+    var u = getUserFromRequest(req)
+    if (!u || u.role !== 'admin') return jsonResponse(res, 403, { error: 'Admin only' })
+    req.on('body', function(body) {
+      try {
+        var data = JSON.parse(body)
+        if (invites[data.code]) {
+          delete invites[data.code]
+          saveJsonFile(INVITES_FILE, invites)
+        }
+        jsonResponse(res, 200, { success: true })
+      } catch(e) { jsonResponse(res, 400, { error: e.message }) }
+    })
+  } catch(e) { jsonResponse(res, 500, { error: e.message }) }
+})
+
+// Admin: List users
+app.get('/api/admin/users', async function(req, res) {
+  try {
+    var u = getUserFromRequest(req)
+    if (!u || u.role !== 'admin') return jsonResponse(res, 403, { error: 'Admin only' })
+    var list = []
+    for (var name in users) {
+      list.push({ username: name, role: users[name].role, createdAt: users[name].createdAt })
+    }
+    jsonResponse(res, 200, list)
+  } catch(e) { jsonResponse(res, 500, { error: e.message }) }
+})
+
+// Admin: Delete user
+app.post('/api/admin/user/delete', async function(req, res) {
+  try {
+    var u = getUserFromRequest(req)
+    if (!u || u.role !== 'admin') return jsonResponse(res, 403, { error: 'Admin only' })
+    req.on('body', function(body) {
+      try {
+        var data = JSON.parse(body)
+        var target = (data.username || '').trim().toLowerCase()
+        if (target === u.username) return jsonResponse(res, 400, { error: 'Cannot delete yourself' })
+        if (!users[target]) return jsonResponse(res, 404, { error: 'User not found' })
+        delete users[target]
+        saveJsonFile(USERS_FILE, users)
+        // Remove their sessions
+        sessions.forEach(function(v, k) { if (v.username === target) sessions.delete(k) })
+        saveSessions()
+        jsonResponse(res, 200, { success: true })
+      } catch(e) { jsonResponse(res, 400, { error: e.message }) }
+    })
+  } catch(e) { jsonResponse(res, 500, { error: e.message }) }
+})
+
 // Serve static files from public/ directory for the SPA frontend
 var MIME_TYPES = { '.html': 'text/html', '.css': 'text/css', '.js': 'application/javascript', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.ico': 'image/x-icon' }
 app.get('/app/*', async function(req, res) {
@@ -287,6 +582,8 @@ app.get('/api/config', async function(req, res) {
   if ( ! (await protect(req, res)) ) return
   try {
     session.requestlog('api/config', req)
+    let currentUser = getUserFromRequest(req)
+    let userPrefs = currentUser && users[currentUser.username] ? users[currentUser.username].preferences : {}
     let config = {
       appname: appname,
       version: version,
@@ -296,9 +593,12 @@ app.get('/api/config', async function(req, res) {
       contentProtect: session.protection.content_protect || '',
       scanMode: session.data.scan_mode || VALID_SCAN_MODES[0],
       linkType: session.data.linkType || VALID_LINK_TYPES[0],
-      favTeams: session.credentials.fav_teams || [],
+      favTeams: (userPrefs.favTeams && userPrefs.favTeams.length > 0) ? userPrefs.favTeams : (session.credentials.fav_teams || []),
       free: argv.free || false,
       showMultiview: argv.show_multiview || false,
+      username: currentUser ? currentUser.username : null,
+      role: currentUser ? currentUser.role : null,
+      hasUsers: Object.keys(users).length > 0,
       validOptions: {
         dates: VALID_DATES,
         mediaTypes: VALID_MEDIA_TYPES,
@@ -346,6 +646,11 @@ app.get('/api/games', async function(req, res) {
   try {
     session.requestlog('api/games', req)
 
+    // Per-user favorite teams
+    let gamesUser = getUserFromRequest(req)
+    let gamesUserPrefs = gamesUser && users[gamesUser.username] ? users[gamesUser.username].preferences : {}
+    let fav_teams = (gamesUserPrefs.favTeams && gamesUserPrefs.favTeams.length > 0) ? gamesUserPrefs.favTeams : (session.credentials.fav_teams || [])
+
     let gameDate = session.liveDate()
     let today = gameDate
     let yesterday = session.yesterdayDate()
@@ -389,9 +694,9 @@ app.get('/api/games', async function(req, res) {
       }
     } else if ( level_ids == levels['MLB'] ) {
       team_ids = session.getTeamIds()
-      for (let i=0; i<session.credentials.fav_teams.length; i++) {
-        if ( session.credentials.fav_teams[i] != '' ) {
-          let affiliate_team_ids = session.getAffiliateTeamIds(session.credentials.fav_teams[i])
+      for (let i=0; i<fav_teams.length; i++) {
+        if ( fav_teams[i] != '' ) {
+          let affiliate_team_ids = session.getAffiliateTeamIds(fav_teams[i])
           if ( affiliate_team_ids ) {
             level_ids = levels['All']
             team_ids += ',' + affiliate_team_ids
@@ -507,10 +812,10 @@ app.get('/api/games', async function(req, res) {
 
         let scheduledInnings = await session.get_scheduled_innings(g)
 
-        let isFavorite = session.credentials.fav_teams.includes(awayTeam.abbreviation) || session.credentials.fav_teams.includes(homeTeam.abbreviation)
+        let isFavorite = fav_teams.includes(awayTeam.abbreviation) || fav_teams.includes(homeTeam.abbreviation)
         let favoriteTeam = null
         if ( isFavorite ) {
-          favoriteTeam = session.credentials.fav_teams.includes(homeTeam.abbreviation) ? homeTeam.abbreviation : awayTeam.abbreviation
+          favoriteTeam = fav_teams.includes(homeTeam.abbreviation) ? homeTeam.abbreviation : awayTeam.abbreviation
         }
 
         let isFreeGame = !!(argv.free && g.broadcasts && g.broadcasts[0] && g.broadcasts[0].freeGame)
@@ -1773,6 +2078,9 @@ app.get('/gamechangerplaylist.m3u8', async function(req, res) {
 
 // Protect pages by password, or content by content_protect url parameter
 async function protect(req, res) {
+  // Session cookie auth — if valid, always allow
+  if (getUserFromRequest(req)) return true
+
   if (argv.page_username && argv.page_password) {
     if ( !session.protection.content_protect || !req.query.content_protect || (req.query.content_protect != session.protection.content_protect) ) {
       if ( !session.protection.content_protect || !req.query.content_protect || !req.query.content_protect[0] || (req.query.content_protect[0] != session.protection.content_protect) ) {

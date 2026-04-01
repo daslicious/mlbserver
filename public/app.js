@@ -7,6 +7,7 @@ import GameTable from './components/GameTable.js'
 import MultiviewPanel from './components/MultiviewPanel.js'
 import ExportLinks from './components/ExportLinks.js'
 import HighlightsModal from './components/HighlightsModal.js'
+import LoginModal from './components/LoginModal.js'
 
 const { createApp, reactive, watch, onMounted } = Vue
 
@@ -33,6 +34,11 @@ const state = reactive({
 
   // Menu open state (persisted to sessionStorage)
   menuOpen: sessionStorage.getItem('menuOpen') === 'true',
+
+  // Auth state
+  username: null,
+  role: null,
+  showLogin: false,
 
   // Filter state
   date: '',
@@ -163,6 +169,51 @@ async function fetchGames() {
   }
 }
 
+// User preference fields that get saved/loaded per-user
+const PREF_KEYS = ['favTeams', 'mediaType', 'linkType', 'resolution', 'audioTrack', 'captions', 'skip', 'skipAdjust', 'scores', 'pad', 'startFrom', 'controls', 'forceVod', 'inningHalf', 'inningNumber']
+// Map state keys to pref keys (they differ in some cases)
+const STATE_TO_PREF = { audioTrack: 'audioTrack', forceVod: 'forceVod', skipAdjust: 'skipAdjust', inningHalf: 'inningHalf', inningNumber: 'inningNumber' }
+
+async function fetchUserPreferences() {
+  if (!state.username) return
+  try {
+    const resp = await fetch('/api/user/preferences')
+    if (resp.ok) {
+      const prefs = await resp.json()
+      // Apply prefs to state — URL params take priority (already restored)
+      const urlParams = parseQueryParams()
+      for (const key of PREF_KEYS) {
+        if (prefs[key] !== undefined && !urlParams[key] && !urlParams[key.toLowerCase()]) {
+          state[key] = prefs[key]
+        }
+      }
+    }
+  } catch (e) {
+    console.error('Failed to fetch preferences:', e)
+  }
+}
+
+var savePrefsTimer = null
+function saveUserPreferences() {
+  if (!state.username) return
+  clearTimeout(savePrefsTimer)
+  savePrefsTimer = setTimeout(async function() {
+    try {
+      const prefs = {}
+      for (const key of PREF_KEYS) {
+        if (state[key] !== undefined) prefs[key] = state[key]
+      }
+      await fetch('/api/user/preferences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(prefs)
+      })
+    } catch (e) {
+      console.error('Failed to save preferences:', e)
+    }
+  }, 1000)
+}
+
 // Actions provided to components
 const actions = {
   setFilter(key, value) {
@@ -172,6 +223,7 @@ const actions = {
       fetchGames()
     }
     syncURL()
+    saveUserPreferences()
   },
 
   getLinkPath() {
@@ -187,6 +239,22 @@ const actions = {
       return prefix + 'content_protect=' + state.config.contentProtect
     }
     return ''
+  },
+
+  async onAuthSuccess() {
+    await fetchConfig()
+    await fetchUserPreferences()
+    await fetchGames()
+  },
+
+  async logout() {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' })
+    } catch (e) {}
+    state.username = null
+    state.role = null
+    await fetchConfig()
+    await fetchGames()
   }
 }
 
@@ -197,7 +265,13 @@ const app = createApp({
   setup() {
     onMounted(async () => {
       await fetchConfig()
+      // Set auth state from config response
+      if (state.config) {
+        state.username = state.config.username || null
+        state.role = state.config.role || null
+      }
       restoreState() // Re-apply after config loads
+      await fetchUserPreferences()
       await fetchGames()
       // Refresh game data every 2 minutes so game states stay current
       setInterval(fetchGames, 2 * 60 * 1000)
@@ -220,5 +294,6 @@ app.component('game-table', GameTable)
 app.component('multiview-panel', MultiviewPanel)
 app.component('export-links', ExportLinks)
 app.component('highlights-modal', HighlightsModal)
+app.component('login-modal', LoginModal)
 
 app.mount('#app')
