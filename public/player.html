@@ -98,13 +98,6 @@ video:not([data-has-video]) {
 .rate-group { display: flex; gap: 2px; }
 .audio-group { display: flex; gap: 2px; }
 
-/* Radio sync panel — top left */
-.radio-panel {
-  position: fixed; top: 12px; left: 12px; z-index: 20;
-  transition: opacity 400ms var(--ease), transform 400ms var(--ease);
-}
-.radio-panel.hidden { opacity: 0; transform: translateY(-4px); pointer-events: none; }
-
 /* Stream switcher panel — top right */
 .stream-panel {
   position: fixed; top: 12px; right: 12px; z-index: 20;
@@ -174,27 +167,6 @@ video:not([data-has-video]) {
   <div class="stream-list" id="streamList"></div>
 </div>
 
-<!-- Radio sync panel — top left -->
-<div class="radio-panel" id="radioPanel">
-  <button class="stream-toggle" id="radioToggle" onclick="toggleRadioPanel()">Radio</button>
-  <div class="stream-list" id="radioList" style="display:none;">
-    <div class="stream-label">Radio Feed</div>
-    <div id="radioFeeds"></div>
-    <div class="stream-divider"></div>
-    <div class="stream-label">Sync Offset</div>
-    <div style="padding: 6px 14px; display: flex; align-items: center; gap: 8px;">
-      <button class="ctrl-btn" onclick="adjustRadioSync(-1)" style="padding: 3px 6px;">-1s</button>
-      <button class="ctrl-btn" onclick="adjustRadioSync(-0.5)" style="padding: 3px 6px;">-0.5</button>
-      <span id="radioSyncDisplay" style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-primary); min-width: 40px; text-align: center;">0.0s</span>
-      <button class="ctrl-btn" onclick="adjustRadioSync(0.5)" style="padding: 3px 6px;">+0.5</button>
-      <button class="ctrl-btn" onclick="adjustRadioSync(1)" style="padding: 3px 6px;">+1s</button>
-    </div>
-    <div style="padding: 4px 14px 8px;">
-      <button class="ctrl-btn" id="radioStopBtn" onclick="stopRadio()" style="display:none; width: 100%; text-align: center;">Stop Radio</button>
-    </div>
-  </div>
-</div>
-
 <audio id="radioAudio" style="display:none;"></audio>
 
 <!-- Bottom controls -->
@@ -217,6 +189,22 @@ video:not([data-has-video]) {
   <button class="ctrl-btn" id="muteBtn" onclick="toggleMute()">Unmute</button>
   <button class="ctrl-btn" id="airplayBtn" onclick="doAirPlay()" style="display:none">AirPlay</button>
   <div class="audio-group" id="audioGroup"></div>
+  <div class="ctrl-sep" id="radioSep" style="display:none;"></div>
+  <div id="radioControls" style="display:none; display:none; align-items:center; gap:4px;">
+    <button class="ctrl-btn" id="radioToggle" onclick="toggleRadioPanel()">Radio</button>
+  </div>
+  <div id="radioPopup" style="display:none; position:absolute; bottom:100%; left:0; right:0; background:var(--bg-bar); backdrop-filter:blur(12px); border-top:1px solid var(--border); padding:10px 16px; z-index:15;">
+    <div style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:8px;" id="radioFeeds"></div>
+    <div style="display:flex; align-items:center; gap:6px;">
+      <span style="font-size:0.65rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.08em;">Sync</span>
+      <button class="ctrl-btn" onclick="adjustRadioSync(-1)" style="padding:3px 6px;">-1s</button>
+      <button class="ctrl-btn" onclick="adjustRadioSync(-0.5)" style="padding:3px 6px;">-.5</button>
+      <span id="radioSyncDisplay" style="font-family:var(--font-mono); font-size:0.72rem; color:var(--text-primary); min-width:36px; text-align:center;">0.0s</span>
+      <button class="ctrl-btn" onclick="adjustRadioSync(0.5)" style="padding:3px 6px;">+.5</button>
+      <button class="ctrl-btn" onclick="adjustRadioSync(1)" style="padding:3px 6px;">+1s</button>
+      <button class="ctrl-btn" id="radioStopBtn" onclick="stopRadio()" style="display:none; margin-left:auto;">Stop</button>
+    </div>
+  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
@@ -459,22 +447,20 @@ window.fetch = function(input, init) {
         var label = (b.homeAway === 'home' ? 'Home' : 'Away') + ' — ' + b.callSign;
         var isActive = b.mediaStateCode === 'MEDIA_ON' || b.mediaStateCode === 'MEDIA_ARCHIVE' || game.status.abstractGameState === 'Final';
         if (isActive) {
-          radioHtml += '<button class="stream-item" onclick="startRadio(\'' + b.mediaId + '\',\'' + b.callSign.replace(/'/g, '') + '\')">' + label + '</button>';
+          radioHtml += '<button class="ctrl-btn" onclick="startRadio(\'' + b.mediaId + '\',\'' + b.callSign.replace(/'/g, '') + '\')">' + label + '</button>';
         }
       });
       spanishFeeds.forEach(function(b) {
         var label = (b.homeAway === 'home' ? 'Casa' : 'Visita') + ' — ' + b.callSign;
         var isActive = b.mediaStateCode === 'MEDIA_ON' || b.mediaStateCode === 'MEDIA_ARCHIVE' || game.status.abstractGameState === 'Final';
         if (isActive) {
-          radioHtml += '<button class="stream-item" onclick="startRadio(\'' + b.mediaId + '\',\'' + b.callSign.replace(/'/g, '') + '\')">' + label + '</button>';
+          radioHtml += '<button class="ctrl-btn" onclick="startRadio(\'' + b.mediaId + '\',\'' + b.callSign.replace(/'/g, '') + '\')">' + label + '</button>';
         }
       });
-      var radioFeeds = document.getElementById('radioFeeds');
-      var radioPanel = document.getElementById('radioPanel');
       if (radioHtml) {
-        radioFeeds.innerHTML = radioHtml;
-      } else {
-        radioPanel.style.display = 'none';
+        document.getElementById('radioFeeds').innerHTML = radioHtml;
+        document.getElementById('radioControls').style.display = 'flex';
+        document.getElementById('radioSep').style.display = '';
       }
     }).catch(function() {});
   } else {
@@ -543,12 +529,14 @@ window.fetch = function(input, init) {
     streamList.classList.toggle('open');
   };
 
-  // Close stream list on click outside
+  // Close panels on click outside
   document.addEventListener('click', function(e) {
     if (!streamPanel.contains(e.target)) streamList.classList.remove('open');
-    var radioPanel = document.getElementById('radioPanel');
-    var radioList = document.getElementById('radioList');
-    if (radioPanel && !radioPanel.contains(e.target)) radioList.style.display = 'none';
+    var radioPopup = document.getElementById('radioPopup');
+    var controlsEl = document.getElementById('controls');
+    if (radioPopup.style.display !== 'none' && !controlsEl.contains(e.target)) {
+      radioPopup.style.display = 'none';
+    }
   });
 
   // Radio sync
@@ -556,10 +544,11 @@ window.fetch = function(input, init) {
   var radioHls = null;
   var radioSyncOffset = 0;
   var radioSyncInterval = null;
+  var radioActive = false;
 
   window.toggleRadioPanel = function() {
-    var radioList = document.getElementById('radioList');
-    radioList.style.display = radioList.style.display === 'none' ? 'block' : 'none';
+    var popup = document.getElementById('radioPopup');
+    popup.style.display = popup.style.display === 'none' ? 'block' : 'none';
   };
 
   window.startRadio = function(mediaId, label) {
@@ -570,9 +559,9 @@ window.fetch = function(input, init) {
     if (radioHls) { radioHls.destroy(); radioHls = null; }
     clearInterval(radioSyncInterval);
 
-    // Mute the video's audio
     video.muted = true;
     document.getElementById('muteBtn').textContent = 'Unmute Video';
+    radioActive = true;
 
     if (Hls.isSupported()) {
       radioHls = new Hls();
@@ -587,16 +576,15 @@ window.fetch = function(input, init) {
       radioAudio.play().catch(function() {});
     }
 
-    // Keep radio synced to video position + offset
     radioSyncInterval = setInterval(syncRadioToVideo, 5000);
-
     document.getElementById('radioStopBtn').style.display = '';
     document.getElementById('radioToggle').textContent = 'Radio: ' + label;
 
-    // Highlight active feed
-    var btns = document.getElementById('radioFeeds').querySelectorAll('.stream-item');
+    var btns = document.getElementById('radioFeeds').querySelectorAll('.ctrl-btn');
     btns.forEach(function(b) { b.classList.remove('active'); });
     if (event && event.target) event.target.classList.add('active');
+
+    document.getElementById('radioPopup').style.display = 'none';
   };
 
   function syncRadioToVideo() {
@@ -620,13 +608,26 @@ window.fetch = function(input, init) {
     radioAudio.pause();
     radioAudio.src = '';
     clearInterval(radioSyncInterval);
+    radioActive = false;
     video.muted = false;
     document.getElementById('muteBtn').textContent = 'Mute';
     document.getElementById('radioStopBtn').style.display = 'none';
     document.getElementById('radioToggle').textContent = 'Radio';
-    var btns = document.getElementById('radioFeeds').querySelectorAll('.stream-item');
+    document.getElementById('radioPopup').style.display = 'none';
+    var btns = document.getElementById('radioFeeds').querySelectorAll('.ctrl-btn');
     btns.forEach(function(b) { b.classList.remove('active'); });
   };
+
+  // Bind radio to video play/pause/seek
+  video.addEventListener('pause', function() {
+    if (radioActive) radioAudio.pause();
+  });
+  video.addEventListener('play', function() {
+    if (radioActive) { radioAudio.play().catch(function() {}); syncRadioToVideo(); }
+  });
+  video.addEventListener('seeked', function() {
+    if (radioActive) syncRadioToVideo();
+  });
 
   // Controls
   window.skip = function(seconds) { video.currentTime = Math.max(0, video.currentTime + seconds); };
@@ -670,30 +671,27 @@ window.fetch = function(input, init) {
     }
   });
 
-  // Auto-hide controls + stream/radio panels on idle
+  // Auto-hide controls + stream panel on idle
   var hideTimer;
-  var rPanel = document.getElementById('radioPanel');
   function showUI() {
     controls.classList.remove('hidden');
     streamPanel.classList.remove('hidden');
-    rPanel.classList.remove('hidden');
     clearTimeout(hideTimer);
     hideTimer = setTimeout(function() {
       if (!video.paused) {
         controls.classList.add('hidden');
         streamPanel.classList.add('hidden');
-        rPanel.classList.add('hidden');
         streamList.classList.remove('open');
-        document.getElementById('radioList').style.display = 'none';
+        document.getElementById('radioPopup').style.display = 'none';
       }
     }, 3000);
   }
 
   document.addEventListener('mousemove', showUI);
   document.addEventListener('touchstart', showUI);
-  video.addEventListener('pause', function() { controls.classList.remove('hidden'); streamPanel.classList.remove('hidden'); rPanel.classList.remove('hidden'); });
+  video.addEventListener('pause', function() { controls.classList.remove('hidden'); streamPanel.classList.remove('hidden'); });
   video.addEventListener('play', function() {
-    hideTimer = setTimeout(function() { controls.classList.add('hidden'); streamPanel.classList.add('hidden'); rPanel.classList.add('hidden'); }, 3000);
+    hideTimer = setTimeout(function() { controls.classList.add('hidden'); streamPanel.classList.add('hidden'); }, 3000);
     if (video.muted) {
       video.muted = false;
       muteBtn.textContent = 'Mute';
