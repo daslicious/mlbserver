@@ -562,8 +562,24 @@ app.get('/app/*', async function(req, res) {
     }
     let ext = path.extname(filePath)
     let contentType = MIME_TYPES[ext] || 'application/octet-stream'
-    fs.readFile(filePath, function(err, data) {
+    fs.readFile(filePath, async function(err, data) {
       if (err) {
+        // For missing logo SVGs, try fetching from MLB CDN and cache locally
+        let logoMatch = reqPath.match(/^\/logos\/(\d+)\.svg$/)
+        if (logoMatch) {
+          try {
+            let logoData = await session.getImage(logoMatch[1])
+            if (logoData) {
+              let logoDir = path.join(__dirname, 'public', 'logos')
+              if (!fs.existsSync(logoDir)) fs.mkdirSync(logoDir, { recursive: true })
+              fs.writeFileSync(filePath, logoData)
+              res.setHeader('Content-Type', 'image/svg+xml')
+              res.setHeader('Access-Control-Allow-Origin', '*')
+              res.end(logoData)
+              return
+            }
+          } catch(e) { session.log('logo fetch error: ' + e.message) }
+        }
         res.error(404, 'Not Found')
         return
       }
