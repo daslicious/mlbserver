@@ -8,6 +8,7 @@ import MultiviewPanel from './components/MultiviewPanel.js'
 import ExportLinks from './components/ExportLinks.js'
 import HighlightsModal from './components/HighlightsModal.js'
 import LoginModal from './components/LoginModal.js'
+import AdminPanel from './components/AdminPanel.js'
 
 const { createApp, reactive, watch, onMounted } = Vue
 
@@ -295,5 +296,6 @@ app.component('multiview-panel', MultiviewPanel)
 app.component('export-links', ExportLinks)
 app.component('highlights-modal', HighlightsModal)
 app.component('login-modal', LoginModal)
+app.component('admin-panel', AdminPanel)
 
 app.mount('#app')
