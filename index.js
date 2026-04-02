@@ -661,6 +661,47 @@ app.get('/api/stream-info', async function(req, res) {
   }
 })
 
+// API: Return stream info for all broadcasts of a game
+app.get('/api/game-streams', async function(req, res) {
+  if ( ! (await protect(req, res)) ) return
+  try {
+    session.requestlog('api/game-streams', req)
+    let gamePk = req.query.gamePk
+    let date = req.query.date
+    if (!gamePk) return jsonResponse(res, 400, { error: 'gamePk required' })
+
+    let gameDate = date || session.liveDate()
+    let cache_data = await session.getDayData(gameDate, false, session.getLevels()['All'], '')
+    if (!cache_data.dates || !cache_data.dates[0]) return jsonResponse(res, 404, { error: 'No games found' })
+
+    let game = cache_data.dates[0].games.find(function(g) { return g.gamePk.toString() === gamePk })
+    if (!game) return jsonResponse(res, 404, { error: 'Game not found' })
+
+    let results = []
+    if (game.broadcasts) {
+      for (var i = 0; i < game.broadcasts.length; i++) {
+        var b = game.broadcasts[i]
+        if (!b.availableForStreaming) continue
+        var mediaType = b.type === 'TV' ? 'MLBTV' : (b.language === 'es' ? 'Spanish' : 'Audio')
+        var info = { mediaId: b.mediaId, callSign: b.callSign, mediaType: mediaType, homeAway: b.homeAway, programDateTime: null }
+        try {
+          var streamInfo = await session.getStreamURL(b.mediaId)
+          if (streamInfo && streamInfo.streamURL) {
+            var variantPlaylist = await session.getVariantPlaylist(streamInfo.streamURL, streamInfo.streamURLToken)
+            var broadcastStart = variantPlaylist ? await session.getBroadcastStart(variantPlaylist) : null
+            if (broadcastStart) info.programDateTime = broadcastStart.toISOString()
+          }
+        } catch(e) { info.error = e.message }
+        results.push(info)
+      }
+    }
+    jsonResponse(res, 200, { gamePk: gamePk, streams: results })
+  } catch (e) {
+    session.log('api/game-streams error : ' + e.message)
+    jsonResponse(res, 500, { error: e.message })
+  }
+})
+
 // API: Return games for a given date/level/org
 app.get('/api/games', async function(req, res) {
   if ( ! (await protect(req, res)) ) return
