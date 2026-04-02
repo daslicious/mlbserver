@@ -772,15 +772,6 @@ app.get('/api/games', async function(req, res) {
       }
     } else if ( level_ids == levels['MLB'] ) {
       team_ids = session.getTeamIds()
-      for (let i=0; i<fav_teams.length; i++) {
-        if ( fav_teams[i] != '' ) {
-          let affiliate_team_ids = session.getAffiliateTeamIds(fav_teams[i])
-          if ( affiliate_team_ids ) {
-            level_ids = levels['All']
-            team_ids += ',' + affiliate_team_ids
-          }
-        }
-      }
     }
     let cache_name = gameDate
     if ( level_ids != levels['MLB'] ) {
