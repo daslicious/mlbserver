@@ -640,6 +640,27 @@ app.get('/api/config', async function(req, res) {
   }
 })
 
+// API: Return stream info including program-date-time for sync
+app.get('/api/stream-info', async function(req, res) {
+  if ( ! (await protect(req, res)) ) return
+  try {
+    session.requestlog('api/stream-info', req)
+    let mediaId = req.query.mediaId
+    if (!mediaId) return jsonResponse(res, 400, { error: 'mediaId required' })
+    let streamInfo = await session.getStreamURL(mediaId)
+    if (!streamInfo || !streamInfo.streamURL) return jsonResponse(res, 404, { error: 'Stream not found' })
+    let variantPlaylist = await session.getVariantPlaylist(streamInfo.streamURL, streamInfo.streamURLToken)
+    let broadcastStart = variantPlaylist ? await session.getBroadcastStart(variantPlaylist) : null
+    jsonResponse(res, 200, {
+      mediaId: mediaId,
+      programDateTime: broadcastStart ? broadcastStart.toISOString() : null
+    })
+  } catch (e) {
+    session.log('api/stream-info error : ' + e.message)
+    jsonResponse(res, 500, { error: e.message })
+  }
+})
+
 // API: Return games for a given date/level/org
 app.get('/api/games', async function(req, res) {
   if ( ! (await protect(req, res)) ) return
