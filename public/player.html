@@ -569,14 +569,14 @@ window.fetch = function(input, init) {
       radioHls.attachMedia(radioAudio);
       radioHls.on(Hls.Events.MANIFEST_PARSED, function() {
         radioAudio.play().catch(function() {});
-        syncRadioToVideo();
+        syncRadioToVideo(true);
       });
     } else {
       radioAudio.src = url;
       radioAudio.play().catch(function() {});
     }
 
-    radioSyncInterval = setInterval(syncRadioToVideo, 5000);
+    radioSyncInterval = setInterval(function() { syncRadioToVideo(false); }, 10000);
     document.getElementById('radioStopBtn').style.display = '';
     document.getElementById('radioToggle').textContent = 'Radio: ' + label;
 
@@ -587,11 +587,19 @@ window.fetch = function(input, init) {
     document.getElementById('radioPopup').style.display = 'none';
   };
 
-  function syncRadioToVideo() {
+  function syncRadioToVideo(force) {
     if (!radioAudio.paused && video.currentTime > 0) {
       var targetTime = video.currentTime + radioSyncOffset;
-      if (Math.abs(radioAudio.currentTime - targetTime) > 2) {
+      var drift = Math.abs(radioAudio.currentTime - targetTime);
+      // Only seek if drift is large (>5s) or forced (initial sync, video seek)
+      if (drift > 5 || force) {
         radioAudio.currentTime = targetTime;
+      }
+      // For small drift, adjust playbackRate to gradually catch up/fall back
+      else if (drift > 0.5) {
+        radioAudio.playbackRate = radioAudio.currentTime < targetTime ? 1.02 : 0.98;
+      } else {
+        radioAudio.playbackRate = 1.0;
       }
     }
   }
@@ -600,7 +608,7 @@ window.fetch = function(input, init) {
     radioSyncOffset += delta;
     radioSyncOffset = Math.round(radioSyncOffset * 10) / 10;
     document.getElementById('radioSyncDisplay').textContent = radioSyncOffset.toFixed(1) + 's';
-    syncRadioToVideo();
+    // Don't seek — let the sync interval handle it smoothly
   };
 
   window.stopRadio = function() {
@@ -623,10 +631,10 @@ window.fetch = function(input, init) {
     if (radioActive) radioAudio.pause();
   });
   video.addEventListener('play', function() {
-    if (radioActive) { radioAudio.play().catch(function() {}); syncRadioToVideo(); }
+    if (radioActive) { radioAudio.play().catch(function() {}); syncRadioToVideo(true); }
   });
   video.addEventListener('seeked', function() {
-    if (radioActive) syncRadioToVideo();
+    if (radioActive) syncRadioToVideo(true);
   });
 
   // Controls
