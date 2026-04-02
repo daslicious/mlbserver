@@ -9,6 +9,7 @@ import ExportLinks from './components/ExportLinks.js'
 import HighlightsModal from './components/HighlightsModal.js'
 import LoginModal from './components/LoginModal.js'
 import AdminPanel from './components/AdminPanel.js'
+import FavoritesSelector from './components/FavoritesSelector.js'
 
 const { createApp, reactive, watch, onMounted } = Vue
 
@@ -297,5 +298,6 @@ app.component('export-links', ExportLinks)
 app.component('highlights-modal', HighlightsModal)
 app.component('login-modal', LoginModal)
 app.component('admin-panel', AdminPanel)
+app.component('favorites-selector', FavoritesSelector)
 
 app.mount('#app')

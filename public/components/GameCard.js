@@ -102,11 +102,14 @@ export default {
         isActive: b.mediaStateCode === 'MEDIA_ON' || b.mediaStateCode === 'MEDIA_ARCHIVE' || this.game.status.abstractGameState === 'Final'
       }))
     },
-    homeBroadcast() {
-      // Prefer non-blacked-out home feed, then any non-blacked-out, then any active feed
-      return this.filteredBroadcasts.find(b => b.homeAway === 'home' && b.isActive && !b.isBlackedOut) ||
+    preferredBroadcast() {
+      // For favorite team games, prefer the favorite team's feed
+      const favSide = this.game.isFavorite && this.game.favoriteTeam
+        ? (this.game.favoriteTeam === this.game.home.abbreviation ? 'home' : 'away')
+        : 'home'
+      return this.filteredBroadcasts.find(b => b.homeAway === favSide && b.isActive && !b.isBlackedOut) ||
         this.filteredBroadcasts.find(b => b.isActive && !b.isBlackedOut) ||
-        this.filteredBroadcasts.find(b => b.homeAway === 'home' && b.isActive) ||
+        this.filteredBroadcasts.find(b => b.homeAway === favSide && b.isActive) ||
         this.filteredBroadcasts.find(b => b.isActive) ||
         this.filteredBroadcasts[0] || null
     },
@@ -129,7 +132,7 @@ export default {
       const hr = this.cfg.httpRoot
       let qs = '?gamePk=' + this.game.gamePk
       if (this.state.gamesData) qs += '&date=' + this.state.gamesData.gameDate
-      if (this.homeBroadcast) qs += '&mediaId=' + this.homeBroadcast.mediaId
+      if (this.preferredBroadcast) qs += '&mediaId=' + this.preferredBroadcast.mediaId
       const s = this.state
       if (s.resolution !== this.cfg.validOptions.resolutions[0]) qs += '&resolution=' + s.resolution
       if (s.audioTrack !== this.cfg.validOptions.audioTracks[0]) qs += '&audio_track=' + encodeURIComponent(s.audioTrack)

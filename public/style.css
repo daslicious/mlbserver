@@ -920,3 +920,26 @@ details.panel > .panel-body {
   transition: color 150ms var(--ease);
 }
 .user-logout:hover { color: var(--text-secondary); }
+
+/* Favorites team grid */
+.fav-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+  gap: 4px;
+}
+
+.fav-team-btn {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 6px 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 120ms var(--ease);
+  text-align: center;
+}
+.fav-team-btn:hover { border-color: var(--border-hover); color: var(--text-secondary); }
+.fav-team-btn.active { font-weight: 700; }
