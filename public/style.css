@@ -909,17 +909,43 @@ details.panel > .panel-body {
   border-radius: var(--radius-sm);
 }
 
-.user-logout {
+/* User menu dropdown */
+.user-menu {
+  position: relative;
+  cursor: pointer;
+}
+
+.user-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 4px 0;
+  min-width: 120px;
+  z-index: 50;
+}
+
+.user-dropdown-item {
+  display: block;
+  width: 100%;
+  padding: 6px 14px;
   font-family: var(--font);
-  font-size: 0.68rem;
-  color: var(--text-muted);
+  font-size: 0.72rem;
+  color: var(--text-secondary);
   background: none;
   border: none;
+  text-align: left;
   cursor: pointer;
-  padding: 4px 6px;
-  transition: color 150ms var(--ease);
+  transition: all 100ms var(--ease);
+  text-decoration: none;
 }
-.user-logout:hover { color: var(--text-secondary); }
+.user-dropdown-item:hover {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
 
 /* Favorites team grid */
 .fav-grid {

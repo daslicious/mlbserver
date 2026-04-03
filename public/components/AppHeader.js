@@ -10,10 +10,13 @@ export default {
         </div>
 
         <div class="header-right">
-          <template v-if="state.username">
-            <span class="user-badge">{{ state.username }}</span>
-            <button class="user-logout" @click="actions.logout()">Logout</button>
-          </template>
+          <div v-if="state.username" class="user-menu" @click.stop="userMenuOpen = !userMenuOpen">
+            <button class="user-badge">{{ state.username }}</button>
+            <div class="user-dropdown" v-if="userMenuOpen">
+              <a class="user-dropdown-item" :href="settingsUrl">Settings</a>
+              <button class="user-dropdown-item" @click="actions.logout()">Logout</button>
+            </div>
+          </div>
           <button v-else class="btn" @click="state.showLogin = true">Login</button>
           <button class="hamburger" :class="{ open: state.menuOpen }" @click="state.menuOpen = !state.menuOpen; sessionStorage.setItem('menuOpen', state.menuOpen)" title="Options">
             <span></span><span></span><span></span>
@@ -58,7 +61,14 @@ export default {
       </div>
     </header>
   `,
+  data() {
+    return { userMenuOpen: false }
+  },
   computed: {
+    settingsUrl() {
+      var cp = this.state.config && this.state.config.contentProtect ? '?content_protect=' + this.state.config.contentProtect : ''
+      return '/app/settings.html' + cp
+    },
     displayDate() {
       if (!this.state.gamesData) return this.state.date || ''
       return this.state.gamesData.gameDate || this.state.date || ''
@@ -71,6 +81,9 @@ export default {
       if (!this.state.gamesData) return this.state.date === 'yesterday'
       return this.state.gamesData.gameDate === this.state.gamesData.yesterday
     }
+  },
+  mounted() {
+    document.addEventListener('click', () => { this.userMenuOpen = false })
   },
   methods: {
     setDate(val) {

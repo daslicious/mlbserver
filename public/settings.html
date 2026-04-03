@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Settings — mlbserver</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg-deep: #06060a;
+  --bg-card: #111118;
+  --bg-surface: #1a1a24;
+  --bg-input: #0e0e16;
+  --border: #1c1c28;
+  --border-hover: #2a2a3a;
+  --text-primary: #eae8e4;
+  --text-secondary: #9895a0;
+  --text-muted: #5c596a;
+  --amber: #e8a84c;
+  --amber-dim: #b07830;
+  --amber-glow: rgba(232, 168, 76, 0.08);
+  --radius: 10px;
+  --radius-sm: 6px;
+  --font: 'Outfit', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'Menlo', monospace;
+  --ease: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 15px; }
+body {
+  font-family: var(--font);
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  min-height: 100vh;
+  line-height: 1.5;
+}
+a { color: var(--amber); text-decoration: none; }
+a:hover { color: #f0be70; }
+
+/* Header */
+.settings-header {
+  position: sticky; top: 0; z-index: 10;
+  background: rgba(6,6,10,0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 0 20px;
+}
+.header-inner {
+  max-width: 600px; margin: 0 auto;
+  display: flex; align-items: center; gap: 14px; height: 50px;
+}
+.back-btn {
+  font-family: var(--font); font-size: 0.78rem; font-weight: 500;
+  padding: 5px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: transparent; color: var(--text-muted); cursor: pointer;
+  transition: all 150ms var(--ease);
+}
+.back-btn:hover { color: var(--text-secondary); border-color: var(--border-hover); }
+.page-title { font-weight: 600; font-size: 1rem; letter-spacing: -0.02em; }
+
+/* Content */
+.content { max-width: 600px; margin: 0 auto; padding: 20px 20px 60px; }
+
+/* Sections */
+.section {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  margin-bottom: 14px;
+}
+.section-title {
+  font-family: var(--font-mono);
+  font-size: 0.65rem; font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 12px;
+}
+.section-row {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 10px;
+}
+.section-row:last-child { margin-bottom: 0; }
+
+/* Username */
+.username {
+  font-family: var(--font-mono);
+  font-size: 1.2rem; font-weight: 600;
+  color: var(--text-primary);
+}
+.role-badge {
+  font-family: var(--font-mono);
+  font-size: 0.6rem; font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.role-badge.admin { background: var(--amber-glow); color: var(--amber); border: 1px solid var(--amber-dim); }
+.role-badge.user { background: var(--bg-surface); color: var(--text-muted); border: 1px solid var(--border); }
+
+.logout-btn {
+  font-family: var(--font); font-size: 0.75rem; font-weight: 500;
+  padding: 6px 16px; border: none; border-radius: var(--radius-sm);
+  background: var(--amber); color: #1a1000; cursor: pointer;
+  transition: background 150ms var(--ease); margin-left: auto;
+}
+.logout-btn:hover { background: #f0be70; }
+
+/* Team grid */
+.team-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(54px, 1fr));
+  gap: 4px;
+}
+.team-btn {
+  font-family: var(--font-mono);
+  font-size: 0.65rem; font-weight: 600;
+  padding: 7px 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 100ms var(--ease);
+  text-align: center;
+}
+.team-btn:hover { border-color: var(--border-hover); color: var(--text-secondary); }
+.team-btn.active { font-weight: 700; }
+
+/* Pill group */
+.pref-label {
+  font-size: 0.62rem; font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 5px;
+}
+.pref-pills { display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: 12px; }
+.pref-pills:last-child { margin-bottom: 0; }
+
+.pill {
+  font-family: var(--font-mono);
+  font-size: 0.65rem; font-weight: 500;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 120ms var(--ease);
+  text-align: center; line-height: 1.3;
+}
+.pill:hover { border-color: var(--border-hover); color: var(--text-secondary); }
+.pill.active { color: var(--amber); border-color: var(--amber-dim); background: var(--amber-glow); }
+.pill-bw { display: block; font-size: 0.5rem; color: var(--text-muted); opacity: 0.6; }
+
+.small-input {
+  font-family: var(--font-mono); font-size: 0.72rem;
+  width: 55px; padding: 4px 6px;
+  background: var(--bg-input); border: 1px solid var(--border);
+  color: var(--text-primary); border-radius: var(--radius-sm); outline: none;
+}
+
+/* Admin */
+.invite-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 0; font-size: 0.72rem;
+}
+.invite-code {
+  font-family: var(--font-mono);
+  font-size: 0.78rem; font-weight: 500;
+  color: var(--amber);
+  padding: 6px 10px;
+  background: var(--amber-glow);
+  border: 1px solid var(--amber-dim);
+  border-radius: var(--radius-sm);
+  user-select: all;
+}
+.small-btn {
+  font-family: var(--font); font-size: 0.65rem;
+  padding: 3px 10px; border: 1px solid var(--border);
+  border-radius: var(--radius-sm); background: transparent;
+  color: var(--text-muted); cursor: pointer;
+  transition: all 150ms var(--ease);
+}
+.small-btn:hover { border-color: var(--border-hover); color: var(--text-secondary); }
+
+.user-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 0; font-size: 0.72rem; color: var(--text-secondary);
+}
+
+/* Export links */
+.export-row {
+  font-size: 0.72rem; color: var(--text-secondary);
+  margin-bottom: 5px;
+}
+.export-row strong { color: var(--text-primary); }
+
+.not-logged-in {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  text-align: center;
+  padding: 20px;
+}
+
+@media (max-width: 500px) {
+  .content { padding: 14px 14px 40px; }
+  .section { padding: 14px 14px; }
+}
+</style>
+</head>
+<body>
+
+<div class="settings-header">
+  <div class="header-inner">
+    <button class="back-btn" onclick="window.location='/'">Back</button>
+    <span class="page-title">Settings</span>
+  </div>
+</div>
+
+<div class="content" id="content">
+  <div class="not-logged-in" id="notLoggedIn" style="display:none;">Please log in to access settings.</div>
+
+  <!-- Account -->
+  <div class="section" id="accountSection" style="display:none;">
+    <div class="section-title">Account</div>
+    <div class="section-row">
+      <span class="username" id="dispUsername"></span>
+      <span class="role-badge" id="dispRole"></span>
+      <button class="logout-btn" onclick="doLogout()">Logout</button>
+    </div>
+  </div>
+
+  <!-- Favorite Teams -->
+  <div class="section" id="favSection" style="display:none;">
+    <div class="section-title">Favorite Teams</div>
+    <div class="team-grid" id="teamGrid"></div>
+  </div>
+
+  <!-- Stream Defaults -->
+  <div class="section" id="defaultsSection" style="display:none;">
+    <div class="section-title">Stream Defaults</div>
+    <div id="defaultsBody"></div>
+  </div>
+
+  <!-- Admin -->
+  <div class="section" id="adminSection" style="display:none;">
+    <div class="section-title">Admin</div>
+    <div id="adminBody"></div>
+  </div>
+
+  <!-- IPTV & Export -->
+  <div class="section" id="exportSection" style="display:none;">
+    <div class="section-title">IPTV &amp; Export</div>
+    <div id="exportBody"></div>
+  </div>
+</div>
+
+<script>
+var _origFetch = window.fetch;
+window.fetch = function(input, init) {
+  if (typeof input === 'string' && input.startsWith('/')) input = window.location.origin + input;
+  return _origFetch.call(this, input, init);
+};
+
+(function() {
+  var params = new URLSearchParams(window.location.search);
+  var contentProtect = params.get('content_protect') || '';
+  function cpParam(prefix) { return contentProtect ? prefix + 'content_protect=' + contentProtect : ''; }
+
+  var config = null;
+  var prefs = {};
+  var saveTimer = null;
+
+  function savePrefs() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(function() {
+      fetch('/api/user/preferences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(prefs)
+      }).catch(function() {});
+    }, 800);
+  }
+
+  async function init() {
+    // Load config
+    try {
+      var r = await fetch('/api/config' + cpParam('?'));
+      config = await r.json();
+    } catch(e) { return; }
+
+    if (!config.username) {
+      document.getElementById('notLoggedIn').style.display = '';
+      return;
+    }
+
+    // Load prefs
+    try {
+      var r2 = await fetch('/api/user/preferences');
+      if (r2.ok) prefs = await r2.json();
+    } catch(e) {}
+
+    renderAccount();
+    renderFavorites();
+    renderDefaults();
+
+    if (config.role === 'admin') {
+      renderAdmin();
+      renderExport();
+    }
+  }
+
+  function renderAccount() {
+    document.getElementById('accountSection').style.display = '';
+    document.getElementById('dispUsername').textContent = config.username;
+    var badge = document.getElementById('dispRole');
+    badge.textContent = config.role;
+    badge.className = 'role-badge ' + config.role;
+  }
+
+  window.doLogout = async function() {
+    try { await fetch('/api/auth/logout', { method: 'POST' }); } catch(e) {}
+    window.location = '/';
+  };
+
+  // Favorites
+  function renderFavorites() {
+    document.getElementById('favSection').style.display = '';
+    var grid = document.getElementById('teamGrid');
+    var favs = prefs.favTeams || config.favTeams || [];
+    var html = '';
+    Object.keys(config.teamColors).forEach(function(team) {
+      var isFav = favs.indexOf(team) >= 0;
+      var style = '';
+      if (isFav) {
+        var c = config.teamColors[team];
+        style = ' style="color:#' + c[0] + ';background:#' + c[1] + ';border-color:#' + c[1] + ';"';
+      }
+      html += '<button class="team-btn' + (isFav ? ' active' : '') + '"' + style + ' onclick="toggleFav(\'' + team + '\')">' + team + '</button>';
+    });
+    grid.innerHTML = html;
+  }
+
+  window.toggleFav = function(team) {
+    var favs = prefs.favTeams || [];
+    var idx = favs.indexOf(team);
+    if (idx >= 0) favs.splice(idx, 1);
+    else favs.push(team);
+    prefs.favTeams = favs;
+    savePrefs();
+    renderFavorites();
+  };
+
+  // Stream defaults
+  function renderDefaults() {
+    document.getElementById('defaultsSection').style.display = '';
+    var vo = config.validOptions;
+    var html = '';
+
+    // Resolution
+    html += '<div class="pref-label">Resolution</div><div class="pref-pills">';
+    vo.resolutions.forEach(function(r, i) {
+      var cls = (prefs.resolution || 'adaptive') === r ? ' active' : '';
+      var bw = vo.displayBandwidths[i] ? '<span class="pill-bw">' + vo.displayBandwidths[i] + '</span>' : '';
+      html += '<button class="pill' + cls + '" onclick="setPref(\'resolution\',\'' + r + '\')">' + r + bw + '</button>';
+    });
+    html += '</div>';
+
+    // Audio Track
+    html += '<div class="pref-label">Audio Track</div><div class="pref-pills">';
+    vo.audioTracks.forEach(function(at, i) {
+      var cls = (prefs.audioTrack || 'all') === at ? ' active' : '';
+      html += '<button class="pill' + cls + '" onclick="setPref(\'audioTrack\',\'' + at + '\')">' + vo.displayAudioTracks[i] + '</button>';
+    });
+    html += '</div>';
+
+    // Captions
+    html += '<div class="pref-label">Captions</div><div class="pref-pills">';
+    vo.captions.forEach(function(c) {
+      var cls = (prefs.captions || 'disabled') === c ? ' active' : '';
+      html += '<button class="pill' + cls + '" onclick="setPref(\'captions\',\'' + c + '\')">' + c + '</button>';
+    });
+    html += '</div>';
+
+    // Skip
+    html += '<div class="pref-label">Skip</div><div class="pref-pills">';
+    vo.skip.forEach(function(s) {
+      var cls = (prefs.skip || 'off') === s ? ' active' : '';
+      html += '<button class="pill' + cls + '" onclick="setPref(\'skip\',\'' + s + '\')">' + s + '</button>';
+    });
+    html += '</div>';
+
+    // Skip Adjust
+    var skipVal = prefs.skip || 'off';
+    if (skipVal !== 'off') {
+      html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:12px;">';
+      html += '<span class="pref-label" style="margin:0;">Skip Adjust</span>';
+      html += '<input type="number" class="small-input" value="' + (prefs.skipAdjust || 0) + '" step="1" onchange="setPref(\'skipAdjust\', parseFloat(this.value))">';
+      html += '</div>';
+    }
+
+    // Pad
+    html += '<div class="pref-label">Pad</div><div class="pref-pills">';
+    vo.pad.forEach(function(p) {
+      var cls = (prefs.pad || 'off') === p ? ' active' : '';
+      html += '<button class="pill' + cls + '" onclick="setPref(\'pad\',\'' + p + '\')">' + p + '</button>';
+    });
+    html += '</div>';
+
+    document.getElementById('defaultsBody').innerHTML = html;
+  }
+
+  window.setPref = function(key, value) {
+    prefs[key] = value;
+    savePrefs();
+    renderDefaults();
+  };
+
+  // Admin
+  async function renderAdmin() {
+    document.getElementById('adminSection').style.display = '';
+    var html = '';
+
+    // Scan Mode
+    html += '<div class="pref-label">Scan Mode</div><div class="pref-pills" style="margin-bottom:14px;">';
+    (config.validOptions.scanModes || ['off','on']).forEach(function(sm) {
+      var cls = (config.scanMode || 'off') === sm ? ' active' : '';
+      html += '<button class="pill' + cls + '" onclick="setScanMode(\'' + sm + '\')">' + sm + '</button>';
+    });
+    html += '</div>';
+
+    // Invites
+    html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">';
+    html += '<span class="pref-label" style="margin:0;">Invite Codes</span>';
+    html += '<button class="small-btn" onclick="generateInvite()">Generate</button>';
+    html += '</div>';
+    html += '<div id="inviteList"></div>';
+
+    // Users
+    html += '<div style="border-top:1px solid var(--border);padding-top:12px;margin-top:12px;">';
+    html += '<span class="pref-label" style="display:block;margin-bottom:6px;">Users</span>';
+    html += '<div id="userList"></div></div>';
+
+    document.getElementById('adminBody').innerHTML = html;
+
+    // Load data
+    try {
+      var [invR, usrR] = await Promise.all([fetch('/api/admin/invites'), fetch('/api/admin/users')]);
+      if (invR.ok) renderInvites(await invR.json());
+      if (usrR.ok) renderUsers(await usrR.json());
+    } catch(e) {}
+  }
+
+  function renderInvites(invites) {
+    var html = '';
+    if (invites.length === 0) html = '<div style="font-size:0.68rem;color:var(--text-muted);margin-bottom:8px;">No active invites</div>';
+    invites.forEach(function(inv) {
+      html += '<div class="invite-row">';
+      html += '<span class="invite-code">' + inv.code + '</span>';
+      html += '<button class="small-btn" onclick="copyText(\'' + inv.code + '\', this)">Copy</button>';
+      html += '<button class="small-btn" onclick="revokeInvite(\'' + inv.code + '\')">Revoke</button>';
+      html += '</div>';
+    });
+    document.getElementById('inviteList').innerHTML = html;
+  }
+
+  function renderUsers(users) {
+    var html = '';
+    users.forEach(function(u) {
+      html += '<div class="user-row">';
+      html += '<span style="color:var(--text-primary);">' + u.username + '</span>';
+      html += '<span style="font-size:0.6rem;color:var(--text-muted);">' + u.role + '</span>';
+      if (u.username !== config.username) {
+        html += '<button class="small-btn" style="margin-left:auto;" onclick="deleteUser(\'' + u.username + '\')">Delete</button>';
+      }
+      html += '</div>';
+    });
+    document.getElementById('userList').innerHTML = html;
+  }
+
+  window.setScanMode = async function(val) {
+    try {
+      await fetch('/api/settings', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scanMode: val })
+      });
+      config.scanMode = val;
+      renderAdmin();
+    } catch(e) {}
+  };
+
+  window.generateInvite = async function() {
+    try {
+      var r = await fetch('/api/admin/invite', { method: 'POST' });
+      var data = await r.json();
+      if (data.code) {
+        var r2 = await fetch('/api/admin/invites');
+        if (r2.ok) renderInvites(await r2.json());
+      }
+    } catch(e) {}
+  };
+
+  window.copyText = function(text, btn) {
+    navigator.clipboard.writeText(text).then(function() {
+      btn.textContent = 'Copied';
+      setTimeout(function() { btn.textContent = 'Copy'; }, 1500);
+    });
+  };
+
+  window.revokeInvite = async function(code) {
+    try {
+      await fetch('/api/admin/invite/revoke', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: code })
+      });
+      var r = await fetch('/api/admin/invites');
+      if (r.ok) renderInvites(await r.json());
+    } catch(e) {}
+  };
+
+  window.deleteUser = async function(username) {
+    try {
+      await fetch('/api/admin/user/delete', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: username })
+      });
+      var r = await fetch('/api/admin/users');
+      if (r.ok) renderUsers(await r.json());
+    } catch(e) {}
+  };
+
+  // Export
+  function renderExport() {
+    document.getElementById('exportSection').style.display = '';
+    var hr = config.httpRoot || '';
+    var cp = cpParam('&');
+    var favs = prefs.favTeams || config.favTeams || [];
+    var teams = (favs.length > 0 && favs[0].length > 0) ? favs.join(',').toLowerCase() : 'ath,atl';
+
+    var html = '';
+    html += '<div class="export-row"><strong>All:</strong> <a href="' + hr + '/channels.m3u?mediaType=Video&resolution=best' + cp + '">channels.m3u</a> | <a href="' + hr + '/guide.xml?mediaType=Video' + cp + '">guide.xml</a> | <a href="' + hr + '/calendar.ics?mediaType=Video' + cp + '">calendar.ics</a></div>';
+    html += '<div class="export-row"><strong>By team:</strong> <a href="' + hr + '/channels.m3u?mediaType=Video&resolution=best&includeTeams=' + teams + cp + '">channels.m3u</a> | <a href="' + hr + '/guide.xml?mediaType=Video&includeTeams=' + teams + cp + '">guide.xml</a> | <a href="' + hr + '/calendar.ics?mediaType=Video&includeTeams=' + teams + cp + '">calendar.ics</a></div>';
+    html += '<div class="export-row"><strong>By team w/ radio:</strong> <a href="' + hr + '/channels.m3u?mediaType=Video&resolution=best&includeTeams=' + teams + '&audio_track=radio' + cp + '">channels.m3u</a> | <a href="' + hr + '/guide.xml?mediaType=Video&includeTeams=' + teams + '&audio_track=radio' + cp + '">guide.xml</a> | <a href="' + hr + '/calendar.ics?mediaType=Video&includeTeams=' + teams + '&audio_track=radio' + cp + '">calendar.ics</a></div>';
+    html += '<div class="export-row"><strong>Include blackouts:</strong> <a href="' + hr + '/channels.m3u?mediaType=Video&resolution=best&includeTeams=' + teams + '&includeBlackouts=true' + cp + '">channels.m3u</a> | <a href="' + hr + '/guide.xml?mediaType=Video&includeTeams=' + teams + '&includeBlackouts=true' + cp + '">guide.xml</a> | <a href="' + hr + '/calendar.ics?mediaType=Video&includeTeams=' + teams + '&includeBlackouts=true' + cp + '">calendar.ics</a></div>';
+    html += '<div class="export-row"><strong>Winter Leagues:</strong> <a href="' + hr + '/channels.m3u?mediaType=Video&resolution=best&includeTeams=winter' + cp + '">m3u</a> | <a href="' + hr + '/guide.xml?mediaType=Video&includeTeams=winter' + cp + '">xml</a> | <a href="' + hr + '/calendar.ics?mediaType=Video&includeTeams=winter' + cp + '">ics</a></div>';
+
+    html += '<div style="border-top:1px solid var(--border);margin-top:10px;padding-top:10px;">';
+    html += '<span class="pref-label" style="display:block;margin-bottom:4px;">Stream Finder Settings</span>';
+    html += '<div style="font-size:0.72rem;color:var(--text-secondary);">';
+    html += '<a href="' + hr + '/downloadsettings' + cpParam('?') + '" download="mlbserverStreamFinder.txt">Download current settings</a>';
+    html += '<div style="margin-top:4px;">Upload from <a href="https://www.baseball-reference.com/stream-finder.shtml" target="_blank">Baseball Reference</a>:';
+    html += '<form action="' + hr + '/upload' + cpParam('?') + '" method="POST" enctype="multipart/form-data" style="margin-top:4px;">';
+    html += '<input name="file" type="file" style="font-size:0.7rem;color:var(--text-secondary);" onchange="this.form.submit()">';
+    html += '</form></div></div></div>';
+
+    document.getElementById('exportBody').innerHTML = html;
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>

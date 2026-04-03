@@ -237,21 +237,13 @@ video:not([data-has-video]) {
     <button class="ctrl-btn" id="radioToggle" onclick="toggleRadioPanel()">Radio</button>
   </div>
   <div style="margin-left: auto;"></div>
-  <button class="ctrl-btn" id="gearBtn" onclick="toggleGear()" title="Stream settings">Settings</button>
+  <button class="ctrl-btn" id="gearBtn" onclick="toggleGear()" title="Quality settings">Quality</button>
 
-  <!-- Gear popup -->
+  <!-- Quality popup -->
   <div class="gear-popup" id="gearPopup">
-    <div class="gear-section">
+    <div class="gear-section" id="gearResSection">
       <div class="gear-label">Resolution</div>
       <div class="gear-pills" id="gearResolution"></div>
-    </div>
-    <div class="gear-section">
-      <div class="gear-label">Audio Track</div>
-      <div class="gear-pills" id="gearAudio"></div>
-    </div>
-    <div class="gear-section">
-      <div class="gear-label">Captions</div>
-      <div class="gear-pills" id="gearCaptions"></div>
     </div>
     <div class="gear-section">
       <div class="gear-label">Skip</div>
@@ -308,8 +300,6 @@ window.fetch = function(input, init) {
   // Stream options — loaded from user prefs, overridable via gear popup
   var streamOpts = {
     resolution: 'adaptive',
-    audio_track: 'all',
-    captions: 'disabled',
     skip: 'off',
     skipAdjust: 0,
     pad: 'off'
@@ -321,8 +311,6 @@ window.fetch = function(input, init) {
     return {};
   }).then(function(prefs) {
     if (prefs.resolution) streamOpts.resolution = prefs.resolution;
-    if (prefs.audioTrack) streamOpts.audio_track = prefs.audioTrack;
-    if (prefs.captions) streamOpts.captions = prefs.captions;
     if (prefs.skip) streamOpts.skip = prefs.skip;
     if (prefs.skipAdjust !== undefined) streamOpts.skipAdjust = prefs.skipAdjust;
     if (prefs.pad) streamOpts.pad = prefs.pad;
@@ -339,8 +327,6 @@ window.fetch = function(input, init) {
       if (r.ok) return r.json(); return {};
     }).then(function(prefs) {
       prefs.resolution = streamOpts.resolution;
-      prefs.audioTrack = streamOpts.audio_track;
-      prefs.captions = streamOpts.captions;
       prefs.skip = streamOpts.skip;
       prefs.skipAdjust = streamOpts.skipAdjust;
       prefs.pad = streamOpts.pad;
@@ -356,8 +342,6 @@ window.fetch = function(input, init) {
   function buildStreamURL(mediaId, mediaType) {
     var url = '/stream.m3u8?mediaId=' + mediaId;
     if (streamOpts.resolution !== 'adaptive') url += '&resolution=' + streamOpts.resolution;
-    if (streamOpts.audio_track !== 'all') url += '&audio_track=' + encodeURIComponent(streamOpts.audio_track);
-    if (streamOpts.captions !== 'disabled') url += '&captions=' + encodeURIComponent(streamOpts.captions);
     if (streamOpts.skip !== 'off') {
       url += '&skip=' + streamOpts.skip;
       if (streamOpts.skipAdjust) url += '&skip_adjust=' + streamOpts.skipAdjust;
@@ -415,9 +399,13 @@ window.fetch = function(input, init) {
         loadingMsg.style.display = 'none';
         if (data.levels && data.levels.some(function(l) { return l.videoCodec; })) {
           video.setAttribute('data-has-video', '');
+          document.getElementById('gearBtn').style.display = '';
+          document.getElementById('gearResSection').style.display = '';
         } else {
           video.removeAttribute('data-has-video');
           video.controls = true;
+          // Hide resolution for audio-only, hide Quality entirely if nothing useful
+          document.getElementById('gearResSection').style.display = 'none';
           if (url.indexOf('force_vod') === -1) {
             var vodUrl = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'force_vod=on';
             hls.destroy();
@@ -480,34 +468,21 @@ window.fetch = function(input, init) {
   if (streamURL) loadStream(streamURL);
 
   // Gear popup — build from config
+  var showResolutions = ['adaptive', '1080p60', '720p60', '720p', '540p', '360p'];
+
   function buildGearPopup() {
     fetch('/api/config' + (contentProtect ? '?content_protect=' + contentProtect : '')).then(function(r) { return r.json(); }).then(function(cfg) {
       var vo = cfg.validOptions;
 
-      // Resolution
+      // Resolution — practical subset
       var resHtml = '';
       vo.resolutions.forEach(function(r, i) {
+        if (showResolutions.indexOf(r) === -1) return;
         var cls = r === streamOpts.resolution ? ' active' : '';
         var bw = vo.displayBandwidths[i] ? '<span class="gear-pill-bw">' + vo.displayBandwidths[i] + '</span>' : '';
         resHtml += '<button class="gear-pill' + cls + '" onclick="setOpt(\'resolution\',\'' + r + '\')">' + r + bw + '</button>';
       });
       document.getElementById('gearResolution').innerHTML = resHtml;
-
-      // Audio track
-      var audHtml = '';
-      vo.audioTracks.forEach(function(at, i) {
-        var cls = at === streamOpts.audio_track ? ' active' : '';
-        audHtml += '<button class="gear-pill' + cls + '" onclick="setOpt(\'audio_track\',\'' + at + '\')">' + vo.displayAudioTracks[i] + '</button>';
-      });
-      document.getElementById('gearAudio').innerHTML = audHtml;
-
-      // Captions
-      var capHtml = '';
-      vo.captions.forEach(function(c) {
-        var cls = c === streamOpts.captions ? ' active' : '';
-        capHtml += '<button class="gear-pill' + cls + '" onclick="setOpt(\'captions\',\'' + c + '\')">' + c + '</button>';
-      });
-      document.getElementById('gearCaptions').innerHTML = capHtml;
 
       // Skip
       var skipHtml = '';
