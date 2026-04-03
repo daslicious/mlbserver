@@ -133,25 +133,8 @@ export default {
       let qs = '?gamePk=' + this.game.gamePk
       if (this.state.gamesData) qs += '&date=' + this.state.gamesData.gameDate
       if (this.preferredBroadcast) qs += '&mediaId=' + this.preferredBroadcast.mediaId
-      const s = this.state
-      if (s.resolution !== this.cfg.validOptions.resolutions[0]) qs += '&resolution=' + s.resolution
-      if (s.audioTrack !== this.cfg.validOptions.audioTracks[0]) qs += '&audio_track=' + encodeURIComponent(s.audioTrack)
-      if (s.captions !== this.cfg.validOptions.captions[0]) qs += '&captions=' + encodeURIComponent(s.captions)
-      if (s.skip !== this.cfg.validOptions.skip[0]) qs += '&skip=' + s.skip
-      if (s.skipAdjust != this.cfg.defaults.skipAdjust) qs += '&skip_adjust=' + s.skipAdjust
-      if (s.inningHalf) qs += '&inning_half=' + s.inningHalf
-      if (s.inningNumber) {
-        const sched = parseInt(this.game.scheduledInnings) || 9
-        qs += '&inning_number=' + Math.max(0, parseInt(s.inningNumber) - (9 - sched))
-      }
-      if (s.pad !== this.cfg.validOptions.pad[0]) qs += '&pad=' + s.pad
-      // Live and upcoming games start at the live point; final games start at the beginning
-      if (this.game.status.abstractGameState === 'Final') {
-        qs += '&startFrom=Beginning'
-      } else {
-        qs += '&startFrom=Live'
-      }
-      if (s.controls !== this.cfg.validOptions.controls[0]) qs += '&controls=' + s.controls
+      // Live games start at live point, final/archive start at beginning
+      qs += '&startFrom=' + (this.game.status.abstractGameState === 'Final' ? 'Beginning' : 'Live')
       qs += this.actions.getContentProtectParam('&')
       return hr + '/app/player.html' + qs
     }

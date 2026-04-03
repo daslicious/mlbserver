@@ -1,6 +1,4 @@
 import AppHeader from './components/AppHeader.js'
-import FilterBar from './components/FilterBar.js'
-import VideoOptions from './components/VideoOptions.js'
 import SpecialStreams from './components/SpecialStreams.js'
 import GameCard from './components/GameCard.js'
 import GameTable from './components/GameTable.js'
@@ -42,24 +40,12 @@ const state = reactive({
   role: null,
   showLogin: false,
 
-  // Filter state
+  // Game listing state
   date: '',
   level: 'MLB',
   org: 'All',
-  mediaType: 'Video',
-  linkType: 'Embed',
-  startFrom: 'Beginning',
-  controls: 'Show',
   scores: 'Hide',
-  resolution: 'adaptive',
-  audioTrack: 'all',
-  captions: 'disabled',
-  forceVod: 'off',
-  inningHalf: '',
-  inningNumber: '',
-  skip: 'off',
-  skipAdjust: 0,
-  pad: 'off',
+  mediaType: 'Video',
   scanMode: 'off',
 
   // View state
@@ -72,53 +58,20 @@ function restoreState() {
   if (params.date) state.date = params.date
   if (params.level) state.level = decodeURIComponent(params.level)
   if (params.org) state.org = decodeURIComponent(params.org)
-  if (params.mediaType) state.mediaType = params.mediaType
-  if (params.linkType) state.linkType = params.linkType
-  if (params.startFrom) state.startFrom = params.startFrom
-  if (params.controls) state.controls = params.controls
   if (params.scores) state.scores = params.scores
-  if (params.resolution) state.resolution = params.resolution
-  if (params.audio_track) state.audioTrack = params.audio_track
-  if (params.captions) state.captions = params.captions
-  if (params.force_vod) state.forceVod = params.force_vod
-  if (params.inning_half) state.inningHalf = params.inning_half
-  if (params.inning_number) state.inningNumber = params.inning_number
-  if (params.skip) state.skip = params.skip
-  if (params.skip_adjust) state.skipAdjust = params.skip_adjust
-  if (params.pad) state.pad = params.pad
-  if (params.scan_mode) state.scanMode = params.scan_mode
+  if (params.mediaType) state.mediaType = params.mediaType
 }
 
 // Sync state to URL
 function syncURL() {
   if (!state.config) return
-  const cfg = state.config
-  const d = cfg.validOptions
   const params = new URLSearchParams()
 
   if (state.date && state.date !== 'today') params.set('date', state.date)
   if (state.level !== 'MLB') params.set('level', state.level)
   if (state.org !== 'All') params.set('org', state.org)
-  if (state.mediaType !== d.mediaTypes[0]) params.set('mediaType', state.mediaType)
-  if (state.linkType !== d.linkTypes[0]) params.set('linkType', state.linkType)
-  if (state.linkType === 'Embed') {
-    if (state.startFrom !== d.startFrom[0]) params.set('startFrom', state.startFrom)
-    if (state.controls !== d.controls[0]) params.set('controls', state.controls)
-  }
-  if (state.scores !== d.scores[0]) params.set('scores', state.scores)
-  if (state.mediaType === 'Video') {
-    if (state.resolution !== d.resolutions[0]) params.set('resolution', state.resolution)
-    if (state.audioTrack !== d.audioTracks[0]) params.set('audio_track', state.audioTrack)
-    if (state.captions !== d.captions[0]) params.set('captions', state.captions)
-    if (state.inningHalf) params.set('inning_half', state.inningHalf)
-    if (state.inningNumber) params.set('inning_number', state.inningNumber)
-    if (state.skip !== d.skip[0]) {
-      params.set('skip', state.skip)
-      if (state.skipAdjust != cfg.defaults.skipAdjust) params.set('skip_adjust', state.skipAdjust)
-    }
-  }
-  if (state.pad !== d.pad[0]) params.set('pad', state.pad)
-  if (state.linkType === 'Stream' && state.forceVod !== d.forceVod[0]) params.set('force_vod', state.forceVod)
+  if (state.scores !== 'Hide') params.set('scores', state.scores)
+  if (state.mediaType !== 'Video') params.set('mediaType', state.mediaType)
 
   const qs = params.toString()
   const newUrl = window.location.pathname + (qs ? '?' + qs : '')
@@ -143,8 +96,6 @@ async function fetchConfig() {
     const resp = await fetch(url)
     const data = await resp.json()
     state.config = data
-    // Apply config defaults to state
-    if (data.linkType) state.linkType = state.linkType || data.linkType
     if (data.scanMode) state.scanMode = data.scanMode
   } catch (e) {
     console.error('Failed to fetch config:', e)
@@ -172,9 +123,7 @@ async function fetchGames() {
 }
 
 // User preference fields that get saved/loaded per-user
-const PREF_KEYS = ['favTeams', 'mediaType', 'linkType', 'resolution', 'audioTrack', 'captions', 'skip', 'skipAdjust', 'scores', 'pad', 'startFrom', 'controls', 'forceVod', 'inningHalf', 'inningNumber']
-// Map state keys to pref keys (they differ in some cases)
-const STATE_TO_PREF = { audioTrack: 'audioTrack', forceVod: 'forceVod', skipAdjust: 'skipAdjust', inningHalf: 'inningHalf', inningNumber: 'inningNumber' }
+const PREF_KEYS = ['favTeams', 'scores', 'mediaType', 'resolution', 'audioTrack', 'captions', 'skip', 'skipAdjust', 'pad']
 
 async function fetchUserPreferences() {
   if (!state.username) return
@@ -182,11 +131,10 @@ async function fetchUserPreferences() {
     const resp = await fetch('/api/user/preferences')
     if (resp.ok) {
       const prefs = await resp.json()
-      // Apply prefs to state — URL params take priority (already restored)
       const urlParams = parseQueryParams()
       for (const key of PREF_KEYS) {
         if (prefs[key] !== undefined && !urlParams[key] && !urlParams[key.toLowerCase()]) {
-          state[key] = prefs[key]
+          if (state[key] !== undefined) state[key] = prefs[key]
         }
       }
     }
@@ -220,20 +168,11 @@ function saveUserPreferences() {
 const actions = {
   setFilter(key, value) {
     state[key] = value
-    // Filters that trigger a data refetch
     if (['date', 'level', 'org'].includes(key)) {
       fetchGames()
     }
     syncURL()
     saveUserPreferences()
-  },
-
-  getLinkPath() {
-    const lt = state.linkType
-    if (lt === 'Embed') return 'app/player.html'
-    if (lt === 'Stream') return 'stream.m3u8'
-    if (lt === 'Download') return 'download.ts'
-    return lt.toLowerCase() + '.html'
   },
 
   getContentProtectParam(prefix) {
@@ -267,15 +206,13 @@ const app = createApp({
   setup() {
     onMounted(async () => {
       await fetchConfig()
-      // Set auth state from config response
       if (state.config) {
         state.username = state.config.username || null
         state.role = state.config.role || null
       }
-      restoreState() // Re-apply after config loads
+      restoreState()
       await fetchUserPreferences()
       await fetchGames()
-      // Refresh game data every 2 minutes so game states stay current
       setInterval(fetchGames, 2 * 60 * 1000)
     })
     return { state }
@@ -288,8 +225,6 @@ app.provide('actions', actions)
 
 // Register components
 app.component('app-header', AppHeader)
-app.component('filter-bar', FilterBar)
-app.component('video-options', VideoOptions)
 app.component('special-streams', SpecialStreams)
 app.component('game-card', GameCard)
 app.component('game-table', GameTable)

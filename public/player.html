@@ -14,6 +14,7 @@
   --bg-bar: rgba(11, 11, 18, 0.92);
   --bg-surface: #1a1a24;
   --bg-card: #111118;
+  --bg-input: #0e0e16;
   --border: #1c1c28;
   --border-hover: #2a2a3a;
   --text-primary: #eae8e4;
@@ -53,8 +54,7 @@ video {
   object-fit: contain;
 }
 video:not([data-has-video]) {
-  height: 120px;
-  max-width: 900px;
+  height: 120px; max-width: 900px;
   background: var(--bg-card);
   border-radius: var(--radius-sm);
   object-fit: initial;
@@ -75,7 +75,6 @@ video:not([data-has-video]) {
   background: linear-gradient(90deg, transparent, var(--amber-dim), transparent); opacity: 0.4;
 }
 .controls.hidden { opacity: 0; transform: translateY(8px); pointer-events: none; }
-.controls.force-hidden { display: none; }
 
 .ctrl-btn {
   font-family: var(--font-mono); font-size: 0.72rem; font-weight: 500;
@@ -98,7 +97,7 @@ video:not([data-has-video]) {
 .rate-group { display: flex; gap: 2px; }
 .audio-group { display: flex; gap: 2px; }
 
-/* Stream switcher panel — top right */
+/* Stream switcher — top right */
 .stream-panel {
   position: fixed; top: 12px; right: 12px; z-index: 20;
   transition: opacity 400ms var(--ease), transform 400ms var(--ease);
@@ -116,7 +115,7 @@ video:not([data-has-video]) {
 .stream-list {
   display: none; margin-top: 6px;
   background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm);
-  padding: 6px 0; min-width: 180px; max-height: 60vh; overflow-y: auto;
+  padding: 6px 0; min-width: 200px; max-height: 60vh; overflow-y: auto;
 }
 .stream-list.open { display: block; }
 
@@ -127,13 +126,56 @@ video:not([data-has-video]) {
 }
 .stream-item:hover { background: var(--bg-surface); color: var(--text-primary); }
 .stream-item.active { color: var(--amber); }
-.stream-item.blacked { color: var(--text-muted); text-decoration: line-through; cursor: default; }
 
 .stream-divider { height: 1px; background: var(--border); margin: 4px 0; }
 
 .stream-label {
   padding: 4px 14px; font-size: 0.58rem; font-weight: 600; color: var(--text-muted);
   text-transform: uppercase; letter-spacing: 0.1em;
+}
+
+/* Gear popup — above controls */
+.gear-popup {
+  display: none;
+  position: absolute; bottom: 100%; right: 0; margin-bottom: 4px;
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 12px 14px; min-width: 260px; max-width: 340px; z-index: 15;
+}
+.gear-popup.open { display: block; }
+
+.gear-section { margin-bottom: 10px; }
+.gear-section:last-child { margin-bottom: 0; }
+
+.gear-label {
+  font-size: 0.6rem; font-weight: 600; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 5px;
+}
+
+.gear-pills { display: flex; flex-wrap: wrap; gap: 3px; }
+
+.gear-pill {
+  font-family: var(--font-mono); font-size: 0.65rem; font-weight: 500;
+  padding: 3px 7px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: transparent; color: var(--text-muted); cursor: pointer;
+  transition: all 120ms var(--ease); line-height: 1.3; text-align: center;
+}
+.gear-pill:hover { border-color: var(--border-hover); color: var(--text-secondary); }
+.gear-pill.active { color: var(--amber); border-color: var(--amber-dim); background: var(--amber-glow); }
+
+.gear-pill-bw { display: block; font-size: 0.5rem; color: var(--text-muted); opacity: 0.6; }
+
+/* Radio sync slider */
+.radio-slider {
+  -webkit-appearance: none; appearance: none; width: 140px; height: 4px;
+  background: var(--border); border-radius: 2px; outline: none; cursor: pointer;
+}
+.radio-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 14px; height: 14px;
+  background: var(--amber); border-radius: 50%; cursor: pointer;
+}
+.radio-slider::-moz-range-thumb {
+  width: 14px; height: 14px;
+  background: var(--amber); border-radius: 50%; border: none; cursor: pointer;
 }
 
 .loading-msg {
@@ -150,6 +192,7 @@ video:not([data-has-video]) {
   .controls { padding: 6px 10px; gap: 4px; }
   .ctrl-btn { font-size: 0.65rem; padding: 4px 7px; }
   .back-btn { font-size: 0.68rem; padding: 4px 8px; }
+  .gear-popup { min-width: 220px; }
 }
 </style>
 </head>
@@ -161,7 +204,7 @@ video:not([data-has-video]) {
 
 <div class="loading-msg" id="loadingMsg"><span>Loading stream...</span></div>
 
-<!-- Stream switcher -->
+<!-- Stream switcher — top right -->
 <div class="stream-panel" id="streamPanel">
   <button class="stream-toggle" id="streamToggle" onclick="toggleStreamList()">Streams</button>
   <div class="stream-list" id="streamList"></div>
@@ -190,18 +233,43 @@ video:not([data-has-video]) {
   <button class="ctrl-btn" id="airplayBtn" onclick="doAirPlay()" style="display:none">AirPlay</button>
   <div class="audio-group" id="audioGroup"></div>
   <div class="ctrl-sep" id="radioSep" style="display:none;"></div>
-  <div id="radioControls" style="display:none; display:none; align-items:center; gap:4px;">
+  <div id="radioControls" style="display:none; align-items:center; gap:4px;">
     <button class="ctrl-btn" id="radioToggle" onclick="toggleRadioPanel()">Radio</button>
   </div>
-  <div id="radioPopup" style="display:none; position:absolute; bottom:100%; left:0; right:0; background:var(--bg-bar); backdrop-filter:blur(12px); border-top:1px solid var(--border); padding:10px 16px; z-index:15;">
+  <div style="margin-left: auto;"></div>
+  <button class="ctrl-btn" id="gearBtn" onclick="toggleGear()" title="Stream settings">Settings</button>
+
+  <!-- Gear popup -->
+  <div class="gear-popup" id="gearPopup">
+    <div class="gear-section">
+      <div class="gear-label">Resolution</div>
+      <div class="gear-pills" id="gearResolution"></div>
+    </div>
+    <div class="gear-section">
+      <div class="gear-label">Audio Track</div>
+      <div class="gear-pills" id="gearAudio"></div>
+    </div>
+    <div class="gear-section">
+      <div class="gear-label">Captions</div>
+      <div class="gear-pills" id="gearCaptions"></div>
+    </div>
+    <div class="gear-section">
+      <div class="gear-label">Skip</div>
+      <div class="gear-pills" id="gearSkip"></div>
+    </div>
+    <div class="gear-section">
+      <div class="gear-label">Pad</div>
+      <div class="gear-pills" id="gearPad"></div>
+    </div>
+  </div>
+
+  <!-- Radio popup -->
+  <div id="radioPopup" style="display:none; position:absolute; bottom:100%; left:0; right:0; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 16px; z-index:15;">
     <div style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:8px;" id="radioFeeds"></div>
-    <div style="display:flex; align-items:center; gap:6px;">
-      <span style="font-size:0.65rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.08em;">Sync</span>
-      <button class="ctrl-btn" onclick="adjustRadioSync(-1)" style="padding:3px 6px;">-1s</button>
-      <button class="ctrl-btn" onclick="adjustRadioSync(-0.5)" style="padding:3px 6px;">-.5</button>
-      <span id="radioSyncDisplay" style="font-family:var(--font-mono); font-size:0.72rem; color:var(--text-primary); min-width:36px; text-align:center;">0.0s</span>
-      <button class="ctrl-btn" onclick="adjustRadioSync(0.5)" style="padding:3px 6px;">+.5</button>
-      <button class="ctrl-btn" onclick="adjustRadioSync(1)" style="padding:3px 6px;">+1s</button>
+    <div style="display:flex; align-items:center; gap:8px;">
+      <span style="font-size:0.6rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.08em;">Sync</span>
+      <input type="range" class="radio-slider" id="radioSlider" min="-30" max="30" step="0.1" value="0" oninput="onRadioSlider(this.value)">
+      <span id="radioSyncDisplay" style="font-family:var(--font-mono); font-size:0.72rem; color:var(--text-primary); min-width:40px; text-align:center;">0.0s</span>
       <button class="ctrl-btn" id="radioStopBtn" onclick="stopRadio()" style="display:none; margin-left:auto;">Stop</button>
     </div>
   </div>
@@ -209,7 +277,7 @@ video:not([data-has-video]) {
 
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <script>
-// Wrap fetch to strip credentials from URLs (fixes basic auth in URL breaking fetch)
+// Wrap fetch to strip credentials from URLs
 var _origFetch = window.fetch;
 window.fetch = function(input, init) {
   if (typeof input === 'string' && input.startsWith('/')) {
@@ -229,23 +297,72 @@ window.fetch = function(input, init) {
   var rateGroup = document.getElementById('rateGroup');
   var streamList = document.getElementById('streamList');
   var streamToggle = document.getElementById('streamToggle');
+  var gearPopup = document.getElementById('gearPopup');
 
   var params = new URLSearchParams(window.location.search);
   var startFrom = params.get('startFrom') || 'Beginning';
-  var showControls = params.get('controls') !== 'Hide';
   var contentProtect = params.get('content_protect') || '';
   var gamePk = params.get('gamePk') || '';
   var currentMediaId = params.get('mediaId') || '';
 
-  // Build stream URL from params
+  // Stream options — loaded from user prefs, overridable via gear popup
+  var streamOpts = {
+    resolution: 'adaptive',
+    audio_track: 'all',
+    captions: 'disabled',
+    skip: 'off',
+    skipAdjust: 0,
+    pad: 'off'
+  };
+
+  // Load user preferences for stream options
+  fetch('/api/user/preferences').then(function(r) {
+    if (r.ok) return r.json();
+    return {};
+  }).then(function(prefs) {
+    if (prefs.resolution) streamOpts.resolution = prefs.resolution;
+    if (prefs.audioTrack) streamOpts.audio_track = prefs.audioTrack;
+    if (prefs.captions) streamOpts.captions = prefs.captions;
+    if (prefs.skip) streamOpts.skip = prefs.skip;
+    if (prefs.skipAdjust !== undefined) streamOpts.skipAdjust = prefs.skipAdjust;
+    if (prefs.pad) streamOpts.pad = prefs.pad;
+    // Now load the stream with these prefs
+    if (!streamURL && currentMediaId) {
+      streamURL = buildStreamURL(currentMediaId);
+      loadStream(streamURL);
+    }
+    buildGearPopup();
+  }).catch(function() { buildGearPopup(); });
+
+  function saveStreamPrefs() {
+    fetch('/api/user/preferences').then(function(r) {
+      if (r.ok) return r.json(); return {};
+    }).then(function(prefs) {
+      prefs.resolution = streamOpts.resolution;
+      prefs.audioTrack = streamOpts.audio_track;
+      prefs.captions = streamOpts.captions;
+      prefs.skip = streamOpts.skip;
+      prefs.skipAdjust = streamOpts.skipAdjust;
+      prefs.pad = streamOpts.pad;
+      fetch('/api/user/preferences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(prefs)
+      });
+    }).catch(function() {});
+  }
+
+  // Build stream URL with current options
   function buildStreamURL(mediaId, mediaType) {
     var url = '/stream.m3u8?mediaId=' + mediaId;
-    var passthrough = ['resolution', 'audio_track', 'captions', 'skip', 'skip_adjust', 'pad', 'force_vod', 'inning_half', 'inning_number'];
-    passthrough.forEach(function(key) {
-      var val = params.get(key);
-      if (val) url += '&' + key + '=' + encodeURIComponent(val);
-    });
-    // Force VOD for audio streams so they get a seekable timeline
+    if (streamOpts.resolution !== 'adaptive') url += '&resolution=' + streamOpts.resolution;
+    if (streamOpts.audio_track !== 'all') url += '&audio_track=' + encodeURIComponent(streamOpts.audio_track);
+    if (streamOpts.captions !== 'disabled') url += '&captions=' + encodeURIComponent(streamOpts.captions);
+    if (streamOpts.skip !== 'off') {
+      url += '&skip=' + streamOpts.skip;
+      if (streamOpts.skipAdjust) url += '&skip_adjust=' + streamOpts.skipAdjust;
+    }
+    if (streamOpts.pad !== 'off') url += '&pad=' + streamOpts.pad;
     if (mediaType && mediaType !== 'MLBTV' && url.indexOf('force_vod') === -1) {
       url += '&force_vod=on';
     }
@@ -254,7 +371,7 @@ window.fetch = function(input, init) {
     return url;
   }
 
-  // Build initial stream URL
+  // Build initial stream URL (for src/msrc/highlight_src — non-mediaId sources)
   var streamURL = '';
   if (params.get('src')) {
     streamURL = params.get('src');
@@ -265,11 +382,12 @@ window.fetch = function(input, init) {
   } else if (params.get('highlight_src')) {
     streamURL = params.get('highlight_src');
     if (contentProtect) streamURL += (streamURL.indexOf('?') >= 0 ? '&' : '?') + 'content_protect=' + contentProtect;
-  } else if (currentMediaId) {
-    streamURL = buildStreamURL(currentMediaId);
+  } else if (params.get('event')) {
+    streamURL = '/stream.m3u8?event=' + params.get('event');
+    if (contentProtect) streamURL += '&content_protect=' + contentProtect;
   }
+  // Note: if currentMediaId, streamURL is built after prefs load
 
-  if (!showControls) controls.classList.add('force-hidden');
   if (window.WebKitPlaybackTargetAvailabilityEvent) airplayBtn.style.display = '';
 
   // HLS instance
@@ -300,7 +418,6 @@ window.fetch = function(input, init) {
         } else {
           video.removeAttribute('data-has-video');
           video.controls = true;
-          // Reload with force_vod for audio streams so they get a seekable timeline
           if (url.indexOf('force_vod') === -1) {
             var vodUrl = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'force_vod=on';
             hls.destroy();
@@ -315,10 +432,8 @@ window.fetch = function(input, init) {
             return;
           }
         }
-        // Autoplay once data is buffered
         function seekToStart() {
           if (startFrom === 'Live') {
-            // Seek to live edge — near the end of available duration
             if (video.duration && isFinite(video.duration)) {
               video.currentTime = video.duration - 10;
             } else if (hls.liveSyncPosition) {
@@ -361,23 +476,84 @@ window.fetch = function(input, init) {
     }
   }
 
-  // Load initial stream
+  // Load initial stream (non-mediaId sources load immediately)
   if (streamURL) loadStream(streamURL);
+
+  // Gear popup — build from config
+  function buildGearPopup() {
+    fetch('/api/config' + (contentProtect ? '?content_protect=' + contentProtect : '')).then(function(r) { return r.json(); }).then(function(cfg) {
+      var vo = cfg.validOptions;
+
+      // Resolution
+      var resHtml = '';
+      vo.resolutions.forEach(function(r, i) {
+        var cls = r === streamOpts.resolution ? ' active' : '';
+        var bw = vo.displayBandwidths[i] ? '<span class="gear-pill-bw">' + vo.displayBandwidths[i] + '</span>' : '';
+        resHtml += '<button class="gear-pill' + cls + '" onclick="setOpt(\'resolution\',\'' + r + '\')">' + r + bw + '</button>';
+      });
+      document.getElementById('gearResolution').innerHTML = resHtml;
+
+      // Audio track
+      var audHtml = '';
+      vo.audioTracks.forEach(function(at, i) {
+        var cls = at === streamOpts.audio_track ? ' active' : '';
+        audHtml += '<button class="gear-pill' + cls + '" onclick="setOpt(\'audio_track\',\'' + at + '\')">' + vo.displayAudioTracks[i] + '</button>';
+      });
+      document.getElementById('gearAudio').innerHTML = audHtml;
+
+      // Captions
+      var capHtml = '';
+      vo.captions.forEach(function(c) {
+        var cls = c === streamOpts.captions ? ' active' : '';
+        capHtml += '<button class="gear-pill' + cls + '" onclick="setOpt(\'captions\',\'' + c + '\')">' + c + '</button>';
+      });
+      document.getElementById('gearCaptions').innerHTML = capHtml;
+
+      // Skip
+      var skipHtml = '';
+      vo.skip.forEach(function(s) {
+        var cls = s === streamOpts.skip ? ' active' : '';
+        skipHtml += '<button class="gear-pill' + cls + '" onclick="setOpt(\'skip\',\'' + s + '\')">' + s + '</button>';
+      });
+      document.getElementById('gearSkip').innerHTML = skipHtml;
+
+      // Pad
+      var padHtml = '';
+      vo.pad.forEach(function(p) {
+        var cls = p === streamOpts.pad ? ' active' : '';
+        padHtml += '<button class="gear-pill' + cls + '" onclick="setOpt(\'pad\',\'' + p + '\')">' + p + '</button>';
+      });
+      document.getElementById('gearPad').innerHTML = padHtml;
+    }).catch(function() {});
+  }
+
+  window.setOpt = function(key, value) {
+    streamOpts[key] = value;
+    saveStreamPrefs();
+    buildGearPopup(); // refresh active states
+    // Reload stream with new options
+    if (currentMediaId) {
+      streamURL = buildStreamURL(currentMediaId);
+      loadStream(streamURL);
+    }
+  };
+
+  window.toggleGear = function() {
+    gearPopup.classList.toggle('open');
+  };
 
   // Fetch game broadcasts for stream switcher
   if (gamePk) {
     var apiUrl = '/api/games?' + (params.get('date') ? 'date=' + params.get('date') : '');
-    if (contentProtect) apiUrl += '&content_protect=' + contentProtect;
+    if (contentProtect) apiUrl += (apiUrl.includes('?') ? '&' : '?') + 'content_protect=' + contentProtect;
     fetch(apiUrl).then(function(r) { return r.json(); }).then(function(data) {
       if (!data.games) return;
       var game = data.games.find(function(g) { return g.gamePk === gamePk; });
       if (!game) return;
 
-      // Set page title
       document.title = game.away.abbreviation + ' @ ' + game.home.abbreviation + ' — mlbserver';
 
       var html = '';
-      // Group broadcasts by type
       var tvFeeds = game.broadcasts.filter(function(b) { return b.mediaType === 'MLBTV' && b.language === 'en'; });
       var audioFeeds = game.broadcasts.filter(function(b) { return b.mediaType === 'Audio'; });
       var spanishFeeds = game.broadcasts.filter(function(b) { return b.mediaType === 'Spanish' || (b.mediaType === 'MLBTV' && b.language === 'es'); });
@@ -387,8 +563,7 @@ window.fetch = function(input, init) {
         tvFeeds.forEach(function(b) {
           var label = (b.isNational ? 'NATIONAL' : (b.homeAway === 'home' ? 'Home' : 'Away')) + ' — ' + b.callSign;
           var isActive = b.mediaStateCode === 'MEDIA_ON' || b.mediaStateCode === 'MEDIA_ARCHIVE' || game.status.abstractGameState === 'Final';
-          var cls = 'stream-item';
-          if (b.mediaId === currentMediaId) cls += ' active';
+          var cls = 'stream-item' + (b.mediaId === currentMediaId ? ' active' : '');
           if (isActive) {
             html += '<button class="' + cls + '" onclick="switchStream(\'' + b.mediaId + '\',\'' + b.mediaType + '\')">' + label + '</button>';
           } else {
@@ -402,8 +577,7 @@ window.fetch = function(input, init) {
         audioFeeds.forEach(function(b) {
           var label = (b.homeAway === 'home' ? 'Home' : 'Away') + ' — ' + b.callSign;
           var isActive = b.mediaStateCode === 'MEDIA_ON' || b.mediaStateCode === 'MEDIA_ARCHIVE' || game.status.abstractGameState === 'Final';
-          var cls = 'stream-item';
-          if (b.mediaId === currentMediaId) cls += ' active';
+          var cls = 'stream-item' + (b.mediaId === currentMediaId ? ' active' : '');
           if (isActive) {
             html += '<button class="' + cls + '" onclick="switchStream(\'' + b.mediaId + '\',\'' + b.mediaType + '\')">' + label + '</button>';
           } else {
@@ -417,8 +591,7 @@ window.fetch = function(input, init) {
         spanishFeeds.forEach(function(b) {
           var label = (b.homeAway === 'home' ? 'Casa' : 'Visita') + ' — ' + b.callSign;
           var isActive = b.mediaStateCode === 'MEDIA_ON' || b.mediaStateCode === 'MEDIA_ARCHIVE' || game.status.abstractGameState === 'Final';
-          var cls = 'stream-item';
-          if (b.mediaId === currentMediaId) cls += ' active';
+          var cls = 'stream-item' + (b.mediaId === currentMediaId ? ' active' : '');
           if (isActive) {
             html += '<button class="' + cls + '" onclick="switchStream(\'' + b.mediaId + '\',\'' + b.mediaType + '\')">' + label + '</button>';
           } else {
@@ -437,11 +610,21 @@ window.fetch = function(input, init) {
         html += '<div id="hlList"></div>';
       }
 
+      // External links: Stream URL, Download, Chromecast, Advanced
+      if (currentMediaId) {
+        var directUrl = window.location.origin + buildStreamURL(currentMediaId);
+        html += '<div class="stream-divider"></div><div class="stream-label">External</div>';
+        html += '<a class="stream-item" href="' + directUrl + '" target="_blank">Stream URL</a>';
+        html += '<a class="stream-item" href="/download.ts?mediaId=' + currentMediaId + (contentProtect ? '&content_protect=' + contentProtect : '') + '&filename=' + encodeURIComponent(game.away.abbreviation + ' @ ' + game.home.abbreviation) + '">Download</a>';
+        html += '<a class="stream-item" href="https://chromecast.link#title=' + encodeURIComponent(game.away.abbreviation + ' @ ' + game.home.abbreviation) + '&content=' + encodeURIComponent(directUrl) + '" target="_blank">Chromecast</a>';
+        html += '<a class="stream-item" href="https://hls-js-dev.netlify.app/demo/?src=' + encodeURIComponent(directUrl) + '" target="_blank">Advanced</a>';
+      }
+
       streamList.innerHTML = html;
       if (html) streamToggle.textContent = 'Streams (' + (tvFeeds.length + audioFeeds.length + spanishFeeds.length) + ')';
       else streamPanel.style.display = 'none';
 
-      // Populate radio feeds for radio sync panel
+      // Radio feeds
       var radioHtml = '';
       audioFeeds.forEach(function(b) {
         var label = (b.homeAway === 'home' ? 'Home' : 'Away') + ' — ' + b.callSign;
@@ -472,70 +655,48 @@ window.fetch = function(input, init) {
     currentMediaId = mediaId;
     var url = buildStreamURL(mediaId, mediaType);
     loadStream(url);
-    // Update active state
     var items = streamList.querySelectorAll('.stream-item');
     items.forEach(function(el) { el.classList.remove('active'); });
-    event.target.classList.add('active');
+    if (event && event.target) event.target.classList.add('active');
     streamList.classList.remove('open');
   };
 
-  // Load highlights into stream list
+  // Highlights
   window.loadHighlights = function(url) {
     var hlList = document.getElementById('hlList');
     var hlToggle = document.getElementById('hlToggle');
-    if (hlList.children.length > 0) {
-      hlList.innerHTML = '';
-      hlToggle.textContent = 'Highlights';
-      return;
-    }
+    if (hlList.children.length > 0) { hlList.innerHTML = ''; hlToggle.textContent = 'Highlights'; return; }
     hlToggle.textContent = 'Loading...';
     fetch(url).then(function(r) { return r.json(); }).then(function(data) {
-      if (!Array.isArray(data) || data.length === 0) {
-        hlToggle.textContent = 'No highlights';
-        return;
-      }
+      if (!Array.isArray(data) || data.length === 0) { hlToggle.textContent = 'No highlights'; return; }
       hlToggle.textContent = 'Highlights (' + data.length + ')';
       var html = '';
       data.forEach(function(h) {
         var title = h.headline || h.title || 'Highlight';
-        var hlsUrl = null;
-        var mp4Url = null;
+        var hlsUrl = null, mp4Url = null;
         if (h.playbacks) {
           h.playbacks.forEach(function(p) {
             if (p.url && p.url.indexOf('.m3u8') >= 0 && !hlsUrl) hlsUrl = p.url;
             if (p.url && p.url.indexOf('.mp4') >= 0 && !mp4Url) mp4Url = p.url;
           });
         }
-        if (hlsUrl) {
-          html += '<button class="stream-item" onclick="playHighlight(\'' + hlsUrl.replace(/'/g, "\\'") + '\')" title="' + title.replace(/"/g, '&quot;') + '">' + title + '</button>';
-        } else if (mp4Url) {
-          html += '<a class="stream-item" href="' + mp4Url + '" target="_blank" title="' + title.replace(/"/g, '&quot;') + '">' + title + ' (MP4)</a>';
-        }
+        if (hlsUrl) html += '<button class="stream-item" onclick="playHighlight(\'' + hlsUrl.replace(/'/g, "\\'") + '\')" title="' + title.replace(/"/g, '&quot;') + '">' + title + '</button>';
+        else if (mp4Url) html += '<a class="stream-item" href="' + mp4Url + '" target="_blank">' + title + ' (MP4)</a>';
       });
       hlList.innerHTML = html;
-    }).catch(function() {
-      hlToggle.textContent = 'Highlights (error)';
-    });
+    }).catch(function() { hlToggle.textContent = 'Highlights (error)'; });
   };
 
-  // Play a highlight in the player
-  window.playHighlight = function(url) {
-    loadStream(url);
-    streamList.classList.remove('open');
-  };
+  window.playHighlight = function(url) { loadStream(url); streamList.classList.remove('open'); };
 
-  // Toggle stream list
-  window.toggleStreamList = function() {
-    streamList.classList.toggle('open');
-  };
+  window.toggleStreamList = function() { streamList.classList.toggle('open'); };
 
   // Close panels on click outside
   document.addEventListener('click', function(e) {
     if (!streamPanel.contains(e.target)) streamList.classList.remove('open');
-    var radioPopup = document.getElementById('radioPopup');
-    var controlsEl = document.getElementById('controls');
-    if (radioPopup.style.display !== 'none' && !controlsEl.contains(e.target)) {
-      radioPopup.style.display = 'none';
+    if (!document.getElementById('controls').contains(e.target)) {
+      gearPopup.classList.remove('open');
+      document.getElementById('radioPopup').style.display = 'none';
     }
   });
 
@@ -560,7 +721,7 @@ window.fetch = function(input, init) {
     clearInterval(radioSyncInterval);
 
     video.muted = true;
-    document.getElementById('muteBtn').textContent = 'Unmute Video';
+    muteBtn.textContent = 'Unmute Video';
     radioActive = true;
 
     if (Hls.isSupported()) {
@@ -591,12 +752,9 @@ window.fetch = function(input, init) {
     if (!radioAudio.paused && video.currentTime > 0) {
       var targetTime = video.currentTime + radioSyncOffset;
       var drift = Math.abs(radioAudio.currentTime - targetTime);
-      // Only seek if drift is large (>5s) or forced (initial sync, video seek)
       if (drift > 5 || force) {
         radioAudio.currentTime = targetTime;
-      }
-      // For small drift, adjust playbackRate to gradually catch up/fall back
-      else if (drift > 0.5) {
+      } else if (drift > 0.5) {
         radioAudio.playbackRate = radioAudio.currentTime < targetTime ? 1.02 : 0.98;
       } else {
         radioAudio.playbackRate = 1.0;
@@ -604,38 +762,31 @@ window.fetch = function(input, init) {
     }
   }
 
-  window.adjustRadioSync = function(delta) {
-    radioSyncOffset += delta;
-    radioSyncOffset = Math.round(radioSyncOffset * 10) / 10;
+  window.onRadioSlider = function(val) {
+    radioSyncOffset = parseFloat(val);
     document.getElementById('radioSyncDisplay').textContent = radioSyncOffset.toFixed(1) + 's';
-    // Don't seek — let the sync interval handle it smoothly
   };
 
   window.stopRadio = function() {
     if (radioHls) { radioHls.destroy(); radioHls = null; }
-    radioAudio.pause();
-    radioAudio.src = '';
+    radioAudio.pause(); radioAudio.src = '';
     clearInterval(radioSyncInterval);
     radioActive = false;
     video.muted = false;
-    document.getElementById('muteBtn').textContent = 'Mute';
+    muteBtn.textContent = 'Mute';
     document.getElementById('radioStopBtn').style.display = 'none';
     document.getElementById('radioToggle').textContent = 'Radio';
     document.getElementById('radioPopup').style.display = 'none';
+    document.getElementById('radioSlider').value = 0;
+    radioSyncOffset = 0;
+    document.getElementById('radioSyncDisplay').textContent = '0.0s';
     var btns = document.getElementById('radioFeeds').querySelectorAll('.ctrl-btn');
     btns.forEach(function(b) { b.classList.remove('active'); });
   };
 
-  // Bind radio to video play/pause/seek
-  video.addEventListener('pause', function() {
-    if (radioActive) radioAudio.pause();
-  });
-  video.addEventListener('play', function() {
-    if (radioActive) { radioAudio.play().catch(function() {}); syncRadioToVideo(true); }
-  });
-  video.addEventListener('seeked', function() {
-    if (radioActive) syncRadioToVideo(true);
-  });
+  video.addEventListener('pause', function() { if (radioActive) radioAudio.pause(); });
+  video.addEventListener('play', function() { if (radioActive) { radioAudio.play().catch(function() {}); syncRadioToVideo(true); } });
+  video.addEventListener('seeked', function() { if (radioActive) syncRadioToVideo(true); });
 
   // Controls
   window.skip = function(seconds) { video.currentTime = Math.max(0, video.currentTime + seconds); };
@@ -690,6 +841,7 @@ window.fetch = function(input, init) {
         controls.classList.add('hidden');
         streamPanel.classList.add('hidden');
         streamList.classList.remove('open');
+        gearPopup.classList.remove('open');
         document.getElementById('radioPopup').style.display = 'none';
       }
     }, 3000);
@@ -700,7 +852,7 @@ window.fetch = function(input, init) {
   video.addEventListener('pause', function() { controls.classList.remove('hidden'); streamPanel.classList.remove('hidden'); });
   video.addEventListener('play', function() {
     hideTimer = setTimeout(function() { controls.classList.add('hidden'); streamPanel.classList.add('hidden'); }, 3000);
-    if (video.muted) {
+    if (video.muted && !radioActive) {
       video.muted = false;
       muteBtn.textContent = 'Mute';
       muteBtn.classList.add('active');

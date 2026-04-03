@@ -53,6 +53,7 @@ export default {
             :value="displayDate"
             @change="setDate($event.target.value)"
           >
+          <button class="btn" :class="{ active: state.scores === 'Show' }" @click="actions.setFilter('scores', state.scores === 'Show' ? 'Hide' : 'Show')">Scores</button>
         </div>
       </div>
     </header>
