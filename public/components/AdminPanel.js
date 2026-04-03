@@ -5,6 +5,17 @@ export default {
     <details class="panel" v-if="state.role === 'admin' && state.menuOpen">
       <summary>Admin</summary>
       <div class="panel-body">
+        <!-- Scan Mode -->
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; align-items: center;">
+          <span class="opt-label" style="margin: 0;">Scan Mode</span>
+          <div class="btn-group">
+            <button v-for="sm in (state.config ? state.config.validOptions.scanModes : [])" :key="sm"
+              class="btn" :class="{ active: state.scanMode === sm }"
+              @click="toggleScanMode(sm)">{{ sm }}</button>
+          </div>
+          <span style="font-size: 0.6rem; color: var(--text-muted);">(ON plays sample for all stream requests)</span>
+        </div>
+
         <!-- Invites -->
         <div style="margin-bottom: 14px;">
           <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
@@ -54,6 +65,15 @@ export default {
     }
   },
   methods: {
+    async toggleScanMode(val) {
+      this.state.scanMode = val;
+      try {
+        await fetch('/api/settings', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ scanMode: val })
+        });
+      } catch (e) {}
+    },
     async loadData() {
       try {
         const [invResp, usrResp] = await Promise.all([

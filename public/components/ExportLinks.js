@@ -2,18 +2,9 @@ export default {
   name: 'ExportLinks',
   inject: ['state', 'actions'],
   template: `
-    <details class="panel" v-if="state.config">
+    <details class="panel" v-if="state.config && state.role === 'admin'">
       <summary>IPTV &amp; Export</summary>
       <div class="panel-body">
-        <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; align-items: center;">
-          <span class="opt-label">Scan Mode</span>
-          <div class="btn-group">
-            <button v-for="sm in state.config.validOptions.scanModes" :key="sm"
-              class="btn" :class="{ active: state.scanMode === sm }"
-              @click="toggleScanMode(sm)">{{ sm }}</button>
-          </div>
-        </div>
-
         <div style="display: flex; flex-direction: column; gap: 5px; font-size: 0.72rem; color: var(--text-secondary);">
           <div><strong style="color: var(--text-primary);">All:</strong>
             <a :href="ex('channels.m3u')">channels.m3u</a> |
@@ -58,24 +49,14 @@ export default {
       const f = this.state.config.favTeams
       return (f && f.length > 0 && f[0].length > 0) ? f.join(',').toLowerCase() : 'ath,atl'
     },
-    res() { const r = this.state.resolution; return (r && r !== 'adaptive') ? r : 'best' }
   },
   methods: {
     ex(file, extra) {
       const hr = this.state.config.httpRoot
-      let url = hr + '/' + file + '?mediaType=' + this.state.mediaType + '&resolution=' + this.res
+      let url = hr + '/' + file + '?mediaType=' + this.state.mediaType + '&resolution=best'
       if (extra) url += extra
       url += this.actions.getContentProtectParam('&')
       return url
-    },
-    async toggleScanMode(val) {
-      this.actions.setFilter('scanMode', val)
-      try {
-        await fetch(this.state.config.httpRoot + '/api/settings', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ scanMode: val })
-        })
-      } catch (e) { console.error('Failed to save scan mode:', e) }
     }
   }
 }
