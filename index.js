@@ -3806,6 +3806,12 @@ app.get('/channels.m3u', async function(req, res) {
 
   var body = await session.getTVData('channels', mediaType, includeTeams, excludeTeams, includeLevels, includeOrgs, server, includeBlackouts, 'false', audio_track, 'false', resolution, pipe, startingChannelNumber)
 
+  // optionally serve channels as server-remuxed MPEG-TS that starts N seconds behind live,
+  // so players with their own file cache (e.g. Kodi) can buffer ahead
+  if ( req.query.buffer && (pipe != 'true') ) {
+    body = body.replaceAll(server + '/stream.m3u8?', server + '/download.ts?buffer=' + parseInt(req.query.buffer) + '&')
+  }
+
   res.writeHead(200, {'Content-Type': 'audio/x-mpegurl'})
   res.end(body)
 })
@@ -4380,6 +4386,11 @@ app.get('/download.ts', async function(req, res) {
     .addInputOption('-fflags', 'nobuffer')
     .addInputOption('-probesize', '1000000')
     .addInputOption('-analyzeduration', '0')
+
+    // start N seconds behind the live edge (MLB segments are ~4s) and let ffmpeg read ahead at full speed
+    if ( req.query.buffer ) {
+      ffmpeg_command.addInputOption('-live_start_index', '-' + (Math.ceil(parseInt(req.query.buffer) / 4) + 1))
+    }
 
     // video
     if ( !req.query.resolution || (req.query.resolution != VALID_RESOLUTIONS[VALID_RESOLUTIONS.length-1]) ) {
