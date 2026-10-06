@@ -2099,22 +2099,24 @@ class sessionClass {
 
           let today = this.liveDate()
           let yesterday = this.yesterdayDate()
-          if ( (dateString == today) && cache_data.dates && cache_data.dates[0] && cache_data.dates[0].games && (cache_data.dates[0].games.length > 1) ) {
-            let finals = false
+          if ( (dateString == today) && cache_data.dates && cache_data.dates[0] && cache_data.dates[0].games && (cache_data.dates[0].games.length > 0) ) {
+            let oneMinuteFromNow = new Date(currentDate)
+            oneMinuteFromNow.setMinutes(oneMinuteFromNow.getMinutes()+1)
             for (var i = 0; i < cache_data.dates[0].games.length; i++) {
               if ( ((cache_data.dates[0].games[i].status.abstractGameState == 'Live') && (cache_data.dates[0].games[i].status.detailedState.indexOf('Suspended') != 0)) || ((cache_data.dates[0].games[i].status.startTimeTBD == true) && (cache_data.dates[0].games[i].status.abstractGameState != 'Final') && (i > 0) && (cache_data.dates[0].games[i-1].status.abstractGameState == 'Final')) ) {
                 this.debuglog('setting cache expiry to 1 minute due to in progress games or upcoming TBD game')
-                currentDate.setMinutes(currentDate.getMinutes()+1)
-                cacheExpiry = currentDate
+                cacheExpiry = oneMinuteFromNow
                 break
-              } else if ( cache_data.dates[0].games[i].status.abstractGameState == 'Final' ) {
-                finals = true
-              } else if ( (finals == false) && (cache_data.dates[0].games[i].status.startTimeTBD == false) ) {
+              } else if ( (cache_data.dates[0].games[i].status.abstractGameState != 'Final') && (cache_data.dates[0].games[i].status.startTimeTBD == false) ) {
+                // refresh 1 hour before the next upcoming game, and every minute once within that hour;
+                // keep looping in case a later game is already live
                 let nextGameDate = new Date(cache_data.dates[0].games[i].gameDate)
                 nextGameDate.setHours(nextGameDate.getHours()-1)
-                this.debuglog('setting cache expiry to 1 hour before next live game')
-                cacheExpiry = nextGameDate
-                break
+                if ( nextGameDate < oneMinuteFromNow ) nextGameDate = oneMinuteFromNow
+                if ( nextGameDate < cacheExpiry ) {
+                  this.debuglog('setting cache expiry to 1 hour before next live game')
+                  cacheExpiry = nextGameDate
+                }
               }
             }
           } else if ( dateString > today ) {

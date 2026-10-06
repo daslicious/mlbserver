@@ -732,18 +732,14 @@ app.get('/api/games', async function(req, res) {
     let gameDate = session.liveDate()
     let today = gameDate
     let yesterday = session.yesterdayDate()
-    let todayUTCHours = session.getTodayUTCHours()
-    let curDate = new Date()
+    // Unlike the old UI, the SPA defaults to today at all hours: it only lists
+    // final games when the menu is open, so defaulting to yesterday in the
+    // morning would hide today's upcoming games
     if ( req.query.date ) {
       if ( req.query.date == VALID_DATES[1] ) {
         gameDate = yesterday
       } else if ( req.query.date != VALID_DATES[0] ) {
         gameDate = req.query.date
-      }
-    } else {
-      let utcHours = curDate.getUTCHours()
-      if ( (utcHours >= todayUTCHours) && (utcHours < YESTERDAY_UTC_HOURS) ) {
-        gameDate = yesterday
       }
     }
 
