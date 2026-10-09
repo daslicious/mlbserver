@@ -4379,7 +4379,7 @@ app.get('/download.ts', async function(req, res) {
       }
     }
 
-    ffmpeg_command = ffmpeg({ timeout: 432000 })
+    let ffmpeg_command = ffmpeg({ timeout: 432000 })
 
     // Set input stream and minimize ffmpeg startup latency
     ffmpeg_command.input(video_url)
@@ -4403,7 +4403,12 @@ app.get('/download.ts', async function(req, res) {
     }
 
     // audio
-    if ( !req.query.audio_track || (req.query.audio_track == VALID_AUDIO_TRACKS[0]) ) {
+    if ( req.query.buffer && !req.query.filename && (!req.query.audio_track || (req.query.audio_track == VALID_AUDIO_TRACKS[0])) ) {
+      // buffered live playback: only the main TV audio, so video arrives right away and players
+      // (e.g. Kodi) don't underestimate the stream bitrate from an audio-only start
+      ffmpeg_command.addOutputOption('-map', '0:a:0')
+      .addOutputOption('-c:a', 'copy')
+    } else if ( !req.query.audio_track || (req.query.audio_track == VALID_AUDIO_TRACKS[0]) ) {
       // if no specific audio track was requested, include and copy them all
       ffmpeg_command.addOutputOption('-map', '0:a')
       .addOutputOption('-c:a', 'copy')
@@ -4468,6 +4473,11 @@ app.get('/download.ts', async function(req, res) {
       download_headers['Content-Disposition'] = 'attachment; filename="' + req.query.filename + '.ts"'
     }
     res.writeHead(200, download_headers)
+
+    // stop ffmpeg when the client goes away, otherwise it keeps running indefinitely
+    res.on('close', function() {
+      ffmpeg_command.kill('SIGKILL')
+    })
 
     ffmpeg_command.run()
   } catch (e) {
