@@ -4387,8 +4387,19 @@ app.get('/download.ts', async function(req, res) {
     .addInputOption('-probesize', '1000000')
     .addInputOption('-analyzeduration', '0')
 
+    // a client reconnecting after a dropped connection (e.g. Kodi) asks to resume at a byte offset;
+    // a live remux can't seek, so answer with a matching partial response and continue near the live edge
+    let resume_from = false
+    if ( req.query.buffer && req.headers.range ) {
+      let range_match = req.headers.range.match(/^bytes=(\d+)-/)
+      if ( range_match && (range_match[1] != '0') ) resume_from = parseInt(range_match[1])
+    }
+    if ( resume_from ) {
+      session.log('download.ts resuming at byte ' + resume_from + ' near the live edge')
+    }
+
     // start N seconds behind the live edge (MLB segments are ~4s) and let ffmpeg read ahead at full speed
-    if ( req.query.buffer ) {
+    if ( req.query.buffer && !resume_from ) {
       ffmpeg_command.addInputOption('-live_start_index', '-' + (Math.ceil(parseInt(req.query.buffer) / 4) + 1))
     }
 
@@ -4472,7 +4483,10 @@ app.get('/download.ts', async function(req, res) {
     if ( req.query.filename ) {
       download_headers['Content-Disposition'] = 'attachment; filename="' + req.query.filename + '.ts"'
     }
-    res.writeHead(200, download_headers)
+    if ( resume_from ) {
+      download_headers['Content-Range'] = 'bytes ' + resume_from + '-' + (resume_from + 1000000000000) + '/*'
+    }
+    res.writeHead(resume_from ? 206 : 200, download_headers)
 
     // stop ffmpeg when the client goes away, otherwise it keeps running indefinitely
     res.on('close', function() {
